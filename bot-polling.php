@@ -1,0 +1,96 @@
+<?php
+// Polling Bot - Works without ngrok!
+// This bot continuously checks for new messages and processes them
+
+echo "🤖 Starting Bot in Polling Mode...\n";
+echo "=====================================\n\n";
+
+include 'bank/config.php';
+include 'bank/bot_functions.php';
+global $db, $API_URL;
+
+echo "✅ Bot Token: " . TOKEN . "\n";
+echo "✅ Database: Connected\n";
+echo "✅ Bot Username: @ISQ_devA_bot\n\n";
+
+echo "Listening for messages... (Press Ctrl+C to stop)\n";
+echo "=====================================\n\n";
+
+$offset = 0;
+
+while (true) {
+    // Get updates from Telegram
+    $url = $API_URL . "getUpdates?offset=$offset&timeout=30";
+    $response = @file_get_contents($url);
+
+    if ($response === false) {
+        echo "⚠️  Connection error, retrying...\n";
+        sleep(5);
+        continue;
+    }
+
+    $updates = json_decode($response, true);
+
+    if (!isset($updates['ok']) || !$updates['ok']) {
+        echo "⚠️  API error, retrying...\n";
+        sleep(5);
+        continue;
+    }
+
+    if (isset($updates['result']) && count($updates['result']) > 0) {
+        foreach ($updates['result'] as $update) {
+            $offset = $update['update_id'] + 1;
+
+            echo "\n📩 [" . date('H:i:s') . "] Received update #" . $update['update_id'] . "\n";
+
+            // Process the update by simulating webhook call
+            $jsonUpdate = json_encode($update);
+
+            // Call index.php via HTTP to process it (same as webhook)
+            $ch = curl_init('http://localhost:8000/bank/index.php');
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $jsonUpdate,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Content-Length: ' . strlen($jsonUpdate)
+                ],
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_TIMEOUT => 10
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode == 200) {
+                // Extract message info
+                if (isset($update['message'])) {
+                    $user_id = $update['message']['from']['id'];
+                    $first_name = $update['message']['from']['first_name'];
+                    $text = $update['message']['text'] ?? '';
+                    echo "   👤 User: $first_name ($user_id)\n";
+                    echo "   💬 Message: $text\n";
+                    echo "   ✅ Processed successfully!\n";
+                } elseif (isset($update['callback_query'])) {
+                    $user_id = $update['callback_query']['from']['id'];
+                    $first_name = $update['callback_query']['from']['first_name'];
+                    $data = $update['callback_query']['data'];
+                    echo "   👤 User: $first_name ($user_id)\n";
+                    echo "   🔘 Callback: $data\n";
+                    echo "   ✅ Processed successfully!\n";
+                }
+            } else {
+                echo "   ❌ Error: HTTP $httpCode\n";
+                if ($response) {
+                    echo "   Response: " . substr($response, 0, 100) . "...\n";
+                }
+            }
+        }
+    }
+
+    // Small delay to avoid hitting API limits
+    usleep(100000); // 0.1 seconds
+}
+
