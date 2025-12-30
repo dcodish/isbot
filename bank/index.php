@@ -7,6 +7,42 @@ global $db, $chat_id, $user_id;
 #$user_id="871736308";
 
 /////////////////////////////////////////////////////////////////////////////////////
+///                    NICKNAME CHECK - MUST HAPPEN FIRST                       /////
+/// /////////////////////////////////////////////////////////////////////////////////
+
+// Check if user is awaiting nickname input
+if (isAwaitingNickname($user_id)) {
+    // User is in "waiting for nickname" state
+    // Process their message as nickname input
+    handleNicknameInput($user_id, $chat_id, $text);
+
+    // Exit - don't process any commands until nickname is set
+    http_response_code(200);
+    echo 'OK';
+    mysqli_close($db);
+    exit;
+}
+
+// Check if user needs to set a nickname (only for existing users)
+$query = "SELECT * FROM users WHERE id=" . $user_id;
+$result = mysqli_query($db, $query);
+$num = mysqli_num_rows($result);
+
+if ($num > 0) {
+    // User exists - check if they have a nickname
+    if (!checkNicknameRequired($user_id, $chat_id)) {
+        // User doesn't have nickname and was just asked for it
+        // Exit - wait for nickname input
+        http_response_code(200);
+        echo 'OK';
+        mysqli_close($db);
+        exit;
+    }
+}
+// If user doesn't exist yet, they'll be created in /start command
+// and will be asked for nickname on next interaction
+
+/////////////////////////////////////////////////////////////////////////////////////
 ///                             BOT logic                                       /////
 /// /////////////////////////////////////////////////////////////////////////////////
 
@@ -16,13 +52,34 @@ switch ($text) {
         $query = "SELECT * FROM users WHERE id=" . $user_id;
         $result = mysqli_query($db, $query);
         $num = mysqli_num_rows($result);
+
         if ($num == 0) {
+            // New user - create account
             $query = "INSERT INTO users (id,first_name,last_name, level, CurrentRun) VALUES ('" . $user_id . "','" . $first_name . "','" . $last_name . "', 1,1)";
-            bot_message($chat_id,$query);
             mysqli_query($db, $query);
+
+            // Ask for nickname immediately for new users
+            setAwaitingNickname($user_id, true);
+            askForNickname($chat_id);
+
+            // Exit and wait for nickname input
+            http_response_code(200);
+            echo 'OK';
+            mysqli_close($db);
+            exit;
         }
+
+        // Existing user - check if they have nickname
+        if (!checkNicknameRequired($user_id, $chat_id)) {
+            // User doesn't have nickname yet
+            http_response_code(200);
+            echo 'OK';
+            mysqli_close($db);
+            exit;
+        }
+
+        // User has nickname - show question
         showNextQ();
-        
 
     } break;
 
@@ -85,6 +142,20 @@ switch ($text) {
         bot_message($chat_id,"שלב 3 - שאלות חדשות רמת קושי בינונית");
         bot_message($chat_id,"שלב 4 - שאלות חדשות רמת קושי גבוהה");
         showNextQ();
+    } break;
+
+    case '/leaderboard' : {
+        // Show top 10 players on leaderboard
+        showLeaderboard($chat_id, 10);
+    } break;
+
+    case '/changenickname' : {
+        // Allow user to change their nickname
+        setAwaitingNickname($user_id, true);
+        $message = "🔄 *שינוי כינוי*\n\n";
+        $message .= "אנא שלח את הכינוי החדש שלך:\n";
+        $message .= "(3-20 תווים, אותיות אנגליות, מספרים וקו תחתון בלבד)";
+        bot_message($chat_id, $message);
     } break;
 
    

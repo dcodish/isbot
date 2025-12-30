@@ -75,3 +75,35 @@
 
 {"update_id":194533567,"callback_query":{"id":"7179583283686458673","from":{"id":1671626997,"is_bot":false,"first_name":"Adi","last_name":"Levi","language_code":"he"},"message":{"message_id":74,"from":{"id":8210054669,"is_bot":true,"first_name":"ISQuestions_devA","username":"ISQ_devA_bot"},"chat":{"id":1671626997,"first_name":"Adi","last_name":"Levi","type":"private"},"date":1766942723,"text":"\u05de\u05d4 \u05d4\u05ea\u05e9\u05d5\u05d1\u05d4 \u05d4\u05db\u05d9 \u05e0\u05db\u05d5\u05e0\u05d4?","reply_markup":{"inline_keyboard":[[{"text":"4","callback_data":"Q:47:A:4:C:2"},{"text":"3","callback_data":"Q:47:A:3:C:2"},{"text":"2","callback_data":"Q:47:A:Correct"},{"text":"1","callback_data":"Q:47:A:1:C:2"}],[{"text":"\u05e1\u05de\u05df \u05db\u05e9\u05d0\u05dc\u05d4 \u05dc\u05d0 \u05d1\u05e8\u05d5\u05e8\u05d4","callback_data":"Bad:47"}],[{"text":"\u05d3\u05dc\u05d2 \u05e9\u05d0\u05dc\u05d4","callback_data":"skip"}]]}},"chat_instance":"1177149221390013693","data":"Q:47:A:Correct"}}
 
+{"update_id":194533568,"message":{"message_id":78,"from":{"id":1671626997,"is_bot":false,"first_name":"Adi","last_name":"Levi","language_code":"he"},"chat":{"id":1671626997,"first_name":"Adi","last_name":"Levi","type":"private"},"date":1766944936,"text":"j"}}
+
+{"update_id":194533569,"message":{"message_id":80,"from":{"id":1671626997,"is_bot":false,"first_name":"Adi","last_name":"Levi","language_code":"he"},"chat":{"id":1671626997,"first_name":"Adi","last_name":"Levi","type":"private"},"date":1766944953,"text":"adi_54"}}
+
+{"update_id":194533570,"message":{"message_id":82,"from":{"id":1671626997,"is_bot":false,"first_name":"Adi","last_name":"Levi","language_code":"he"},"chat":{"id":1671626997,"first_name":"Adi","last_name":"Levi","type":"private"},"date":1766944961,"text":"\/start","entities":[{"offset":0,"length":6,"type":"bot_command"}]}}
+
+{"update_id":194533571,"message":{"message_id":85,"from":{"id":1163199287,"is_bot":false,"first_name":"Ben","language_code":"en"},"chat":{"id":1163199287,"first_name":"Ben","type":"private"},"date":1766947289,"text":"\/start","entities":[{"offset":0,"length":6,"type":"bot_command"}]}}
+
+{"update_id":194533572,"message":{"message_id":89,"from":{"id":1163199287,"is_bot":false,"first_name":"Ben","language_code":"en"},"chat":{"id":1163199287,"first_name":"Ben","type":"private"},"date":1766947301,"text":"jsaa"}}
+
+{"update_id":194533573,"message":{"message_id":91,"from":{"id":1163199287,"is_bot":false,"first_name":"Ben","language_code":"en"},"chat":{"id":1163199287,"first_name":"Ben","type":"private"},"date":1766947311,"text":"$"}}
+
+{"update_id":194533574,"message":{"message_id":93,"from":{"id":1163199287,"is_bot":false,"first_name":"Ben","language_code":"en"},"chat":{"id":1163199287,"first_name":"Ben","type":"private"},"date":1766947330,"text":"a"}}
+
+{"update_id":194533575,"message":{"message_id":95,"from":{"id":1163199287,"is_bot":false,"first_name":"Ben","language_code":"en"},"chat":{"id":1163199287,"first_name":"Ben","type":"private"},"date":1766947362,"text":"dggffghfufycjdjtdjtdkydjtdktsktdktdjtsjtsjtsjtsjtsjtsjtsjtdky"}}
+
+{"update_id":194533576,"message":{"message_id":97,"from":{"id":1163199287,"is_bot":false,"first_name":"Ben","language_code":"en"},"chat":{"id":1163199287,"first_name":"Ben","type":"private"},"date":1766947373,"text":"adi_54"}}
+
+{"update_id":194533577,"message":{"message_id":99,"from":{"id":1671626997,"is_bot":false,"first_name":"Adi","last_name":"Levi","language_code":"he"},"chat":{"id":1671626997,"first_name":"Adi","last_name":"Levi","type":"private"},"date":1766957304,"text":"\/start","entities":[{"offset":0,"length":6,"type":"bot_command"}]}}
+
+{"update_id":194533578,"message":{"message_id":101,"from":{"id":1671626997,"is_bot":false,"first_name":"Adi","last_name":"Levi","language_code":"he"},"chat":{"id":1671626997,"first_name":"Adi","last_name":"Levi","type":"private"},"date":1766957309,"text":"*"}}
+
+{"update_id":194533579,"message":{"message_id":103,"from":{"id":1671626997,"is_bot":false,"first_name":"Adi","last_name":"Levi","language_code":"he"},"chat":{"id":1671626997,"first_name":"Adi","last_name":"Levi","type":"private"},"date":1766957315,"text":"45456456464564646545646464"}}
+
+{"update_id":194533580,"message":{"message_id":105,"from":{"id":1671626997,"is_bot":false,"first_name":"Adi","last_name":"Levi","language_code":"he"},"chat":{"id":1671626997,"first_name":"Adi","last_name":"Levi","type":"private"},"date":1766957322,"text":"adilevi!"}}
+
+{"update_id":194533581,"message":{"message_id":107,"from":{"id":1671626997,"is_bot":false,"first_name":"Adi","last_name":"Levi","language_code":"he"},"chat":{"id":1671626997,"first_name":"Adi","last_name":"Levi","type":"private"},"date":1766957348,"text":"adi5454."}}
+
+{"update_id":194533582,"message":{"message_id":109,"from":{"id":1671626997,"is_bot":false,"first_name":"Adi","last_name":"Levi","language_code":"he"},"chat":{"id":1671626997,"first_name":"Adi","last_name":"Levi","type":"private"},"date":1766957356,"text":"adi_54"}}
+
+{"update_id":194533583,"message":{"message_id":111,"from":{"id":1671626997,"is_bot":false,"first_name":"Adi","last_name":"Levi","language_code":"he"},"chat":{"id":1671626997,"first_name":"Adi","last_name":"Levi","type":"private"},"date":1766957364,"text":"\/start","entities":[{"offset":0,"length":6,"type":"bot_command"}]}}
+

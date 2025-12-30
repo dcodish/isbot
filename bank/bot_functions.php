@@ -528,3 +528,211 @@ function showNextQ() { //this function should determine what kind of question to
     }
 }
 
+/////////////////////////////////////////////////////////////////////////
+///              NICKNAME SYSTEM FUNCTIONS                           ////
+/////////////////////////////////////////////////////////////////////////
+
+/**
+ * Check if user has a nickname set
+ * @return bool True if nickname exists, false otherwise
+ */
+function hasNickname($user_id) {
+    global $db;
+    $query = "SELECT nickname FROM users WHERE id = $user_id";
+    $result = mysqli_query($db, $query);
+
+    if ($result && mysqli_num_rows($result) > 0) {
+        $fetch = mysqli_fetch_assoc($result);
+        mysqli_free_result($result);
+        return !empty($fetch['nickname']) && !is_null($fetch['nickname']);
+    }
+    return false;
+}
+
+/**
+ * Check if user is awaiting nickname input
+ * @return bool True if awaiting, false otherwise
+ */
+function isAwaitingNickname($user_id) {
+    global $db;
+    $query = "SELECT awaiting_nickname FROM users WHERE id = $user_id";
+    $result = mysqli_query($db, $query);
+
+    if ($result && mysqli_num_rows($result) > 0) {
+        $fetch = mysqli_fetch_assoc($result);
+        mysqli_free_result($result);
+        return $fetch['awaiting_nickname'] == 1;
+    }
+    return false;
+}
+
+/**
+ * Set user's awaiting_nickname flag
+ * @return bool Success status
+ */
+function setAwaitingNickname($user_id, $awaiting = true) {
+    global $db;
+    $flag = $awaiting ? 1 : 0;
+    $query = "UPDATE users SET awaiting_nickname = $flag WHERE id = $user_id";
+    return mysqli_query($db, $query);
+}
+
+/**
+ * Ask user for nickname
+ */
+function askForNickname($chat_id) {
+    $message = "🎮 ברוכים הבאים לבוט הקורס יסודות מערכות מידע!\n\n";
+    $message .= "כדי להצטרף, אנא בחר כינוי ייחודי.\n\n";
+    $message .= "📋 *כללים:*\n";
+    $message .= "• 3-15 תווים\n";
+    $message .= "• אותיות באנגלית, מספרים וקו תחתון בלבד\n";
+    $message .= "אנא שלח את הכינוי שלך:";
+
+    bot_message($chat_id, $message);
+}
+
+/**
+ * Validate nickname format
+ * @return bool True if valid, false otherwise
+ */
+function validateNickname($nickname) {
+    // Only letters, numbers, underscore, 3-20 characters
+    return preg_match('/^[a-zA-Z0-9_]{3,15}$/', $nickname);
+}
+
+/**
+ * Check if nickname is already taken by another user
+ * @return bool True if taken, false if available
+ */
+function isNicknameTaken($nickname, $exclude_user_id = null) {
+    global $db;
+    $nickname = mysqli_real_escape_string($db, $nickname);
+
+    $query = "SELECT id FROM users WHERE nickname = '$nickname'";
+    if ($exclude_user_id !== null) {
+        $query .= " AND id != $exclude_user_id";
+    }
+    $query .= " LIMIT 1";
+
+    $result = mysqli_query($db, $query);
+    $taken = ($result && mysqli_num_rows($result) > 0);
+
+    if ($result) {
+        mysqli_free_result($result);
+    }
+
+    return $taken;
+}
+
+/**
+ * Update user's nickname and set timestamp
+ * @return array ['success' => bool, 'error' => string|null]
+ */
+function updateNickname($user_id, $nickname) {
+    global $db;
+
+    // Validate format
+    if (!validateNickname($nickname)) {
+        return [
+            'success' => false,
+            'error' => 'invalid_format'
+        ];
+    }
+
+    // Check if taken by another user
+    if (isNicknameTaken($nickname, $user_id)) {
+        return [
+            'success' => false,
+            'error' => 'already_taken'
+        ];
+    }
+
+    // Update with unique constraint handling
+    $nickname = mysqli_real_escape_string($db, $nickname);
+
+    $query = "UPDATE users 
+              SET nickname = '$nickname', 
+                  awaiting_nickname = 0,
+                  nickname_set_at = NOW()
+              WHERE id = $user_id";
+
+    $result = mysqli_query($db, $query);
+
+    if ($result) {
+        return ['success' => true, 'error' => null];
+    } else {
+        // Check if it's a duplicate key error
+        if (mysqli_errno($db) == 1062) { // Duplicate entry
+            return [
+                'success' => false,
+                'error' => 'already_taken'
+            ];
+        }
+        return [
+            'success' => false,
+            'error' => 'database_error'
+        ];
+    }
+}
+
+/**
+ * Handle nickname input from user
+ * Processes the nickname and sends appropriate response
+ */
+function handleNicknameInput($user_id, $chat_id, $text) {
+    $proposed_nickname = trim($text);
+
+    // Validate and update
+    $result = updateNickname($user_id, $proposed_nickname);
+
+    if ($result['success']) {
+        // Success!
+        $message = "✅ *הכינוי נקבע בהצלחה!*\n\n";
+        $message .= "הכינוי שלך: `$proposed_nickname`\n\n";
+        $message .= "עכשיו תוכל להשתמש בבוט. שלח /start כדי להתחיל!";
+        bot_message($chat_id, $message);
+        writeLog(14, 0); // Log nickname set action
+    } else {
+        // Error handling
+        if ($result['error'] == 'invalid_format') {
+            $message = "❌ *פורמט כינוי לא תקין!*\n\n";
+            $message .= "הכינוי שלך חייב:\n";
+            $message .= "• להיות באורך 3-15 תווים\n";
+            $message .= "• להכיל רק אותיות אנגליות, מספרים וקו תחתון\n\n";
+            $message .= "דוגמאות: `player123`, `quiz_master`\n\n";
+            $message .= "אנא נסה שוב:";
+            bot_message($chat_id, $message);
+        } elseif ($result['error'] == 'already_taken') {
+            $message = "❌ *הכינוי כבר תפוס!*\n\n";
+            $message .= "מישהו אחר כבר משתמש בכינוי `$proposed_nickname`.\n\n";
+            $message .= "אנא בחר כינוי אחר:";
+            bot_message($chat_id, $message);
+        } else {
+            $message = "❌ אירעה שגיאה. אנא נסה שוב או פנה לתמיכה.";
+            bot_message($chat_id, $message);
+        }
+    }
+
+    return $result['success'];
+}
+
+/**
+ * Check and handle nickname requirement for user
+ * Returns true if user can proceed, false if waiting for nickname
+ */
+function checkNicknameRequired($user_id, $chat_id) {
+    // Check if user already has a nickname
+    if (hasNickname($user_id)) {
+        return true; // User has nickname, can proceed
+    }
+
+    // Check if already waiting for nickname
+    if (!isAwaitingNickname($user_id)) {
+        // First time - ask for nickname
+        setAwaitingNickname($user_id, true);
+        askForNickname($chat_id);
+    }
+
+    return false; // User needs to set nickname
+}
+
