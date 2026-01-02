@@ -502,6 +502,115 @@ function showKeyboard($step) {
     return true;
 }
 
+/////////////////////////////////////////////////////////////////////////
+///              POINTS SYSTEM FUNCTIONS                             ////
+/////////////////////////////////////////////////////////////////////////
+
+/**
+ * Determine question difficulty level based on success rate
+ * @param int $questionId Question ID
+ * @return int Level 1-4 (1=easy, 4=very hard)
+ */
+function getQuestionDifficultyLevel($questionId) {
+    global $db;
+
+    $safe_qid = intval($questionId);
+    $query = "SELECT numofcorrectanswers, numofanswers FROM questions WHERE id = $safe_qid";
+    $result = mysqli_query($db, $query);
+
+    if (!$result || mysqli_num_rows($result) == 0) {
+        return 2; // Default to medium if no data
+    }
+
+    $row = mysqli_fetch_assoc($result);
+    mysqli_free_result($result);
+
+    if ($row['numofanswers'] == 0) {
+        return 2; // Default to medium if no answer data
+    }
+
+    $successRate = $row['numofcorrectanswers'] / $row['numofanswers'];
+
+    // Determine level based on success rate thresholds
+    if ($successRate >= 0.8) return 1;      // Easy (≥80% success)
+    if ($successRate >= 0.7) return 2;      // Medium (70-80% success)
+    if ($successRate >= 0.6) return 3;      // Hard (60-70% success)
+    return 4;                                // Very hard (<60% success)
+}
+
+/**
+ * Get points from point_rules table
+ * @param int $actionType 1=correct, 2=wrong
+ * @param int $questionLevel 1-4
+ * @return int Points to add/deduct
+ */
+function getPointsFromRules($actionType, $questionLevel) {
+    global $db;
+
+    $safe_action = intval($actionType);
+    $safe_level = intval($questionLevel);
+
+    $query = "SELECT points FROM point_rules WHERE action_type = $safe_action AND question_level = $safe_level";
+    $result = mysqli_query($db, $query);
+
+    if (!$result || mysqli_num_rows($result) == 0) {
+        error_log("No points rule found for action_type={$safe_action}, question_level={$safe_level}");
+        return 0;
+    }
+
+    $row = mysqli_fetch_assoc($result);
+    mysqli_free_result($result);
+
+    return intval($row['points']);
+}
+
+/**
+ * Award or deduct points for user answer
+ * @param int $userId User Telegram ID
+ * @param int $questionId Question ID
+ * @param int $actionType 1=correct, 2=wrong
+ * @return int Points changed
+ */
+function updateUserPoints($userId, $questionId, $actionType) {
+    global $db;
+
+    $safe_user_id = intval($userId);
+    $safe_question_id = intval($questionId);
+    $safe_action_type = intval($actionType);
+
+    // Get question difficulty level based on success rate
+    $questionLevel = getQuestionDifficultyLevel($safe_question_id);
+
+    // Get points from rules
+    $pointsChange = getPointsFromRules($safe_action_type, $questionLevel);
+
+    if ($pointsChange == 0) {
+        error_log("No points change for user={$safe_user_id}, question={$safe_question_id}");
+        return 0;
+    }
+
+    // Update user's overall_points (if column exists)
+    $query = "UPDATE users SET overall_points = overall_points + $pointsChange WHERE id = $safe_user_id";
+    $result = mysqli_query($db, $query);
+
+    if (!$result) {
+        error_log("Failed to update user points: " . mysqli_error($db));
+    }
+
+    // Log the transaction in point_log
+    $query = "INSERT INTO point_log (user_id, question_id, action_type, question_level, points_change) 
+              VALUES ($safe_user_id, $safe_question_id, $safe_action_type, $questionLevel, $pointsChange)";
+    $result = mysqli_query($db, $query);
+
+    if (!$result) {
+        error_log("Failed to log points: " . mysqli_error($db));
+    }
+
+    return $pointsChange;
+}
+
+/////////////////////////////////////////////////////////////////////////
+
 function recordAnswer($qid, $type){
     // type can be: 1-correct, 2-wrong, 3-bad
     global $db, $user_id, $chat_id;
@@ -580,6 +689,14 @@ function recordAnswer($qid, $type){
             $query ="UPDATE questions SET reportedbad = ".$reportedBad." WHERE id=".$qid;
             mysqli_query($db, $query);
         } break;
+    }
+
+    // Award/deduct points for correct or wrong answers
+    if ($type == 1 || $type == 2) {
+        $pointsChange = updateUserPoints($user_id, $qid, $type);
+
+        // Optional: Log points change for debugging
+        error_log("User {$user_id} answered question {$qid}, type={$type}, points change={$pointsChange}");
     }
 
     $query = "SELECT * FROM users WHERE id=".$user_id;
