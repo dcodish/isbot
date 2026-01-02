@@ -63,6 +63,72 @@ function bot_message($chat_id, $msg, $markup = null) {
 }
 
 
+/**
+ * Show main menu with inline keyboard buttons
+ */
+function showMainMenu($chat_id) {
+    global $user_id, $db;
+
+    // Get user stats
+    $safe_user_id = intval($user_id);
+    $query = "SELECT nickname, overall_points FROM users WHERE id = $safe_user_id";
+    $result = mysqli_query($db, $query);
+
+    $nickname = "Guest";
+    $points = 0;
+
+    if ($result && mysqli_num_rows($result) > 0) {
+        $row = mysqli_fetch_assoc($result);
+        $nickname = $row['nickname'] ? $row['nickname'] : "Guest";
+        $points = $row['overall_points'] ? $row['overall_points'] : 0;
+        mysqli_free_result($result);
+    }
+
+    $message = "🎯 תפריט ראשי\n\n";
+    $message .= "שלום {$nickname}! 👋\n";
+    $message .= "צברת עד כה  {$points} נקודות 🏆\n\n";
+    $message .= "בחר פעולה:";
+
+    // Create inline keyboard with menu options
+    $keyboard = array(
+        array(
+            array('text' => '🎮 התחל לשחק', 'callback_data' => 'menu_start'),
+        ),
+        array(
+            array('text' => '🏆 טבלת מובילים - כל הזמנים', 'callback_data' => 'menu_leaderboard_all'),
+        ),
+        array(
+            array('text' => '📆 טבלת מובילים - חודשי', 'callback_data' => 'menu_leaderboard_monthly'),
+        ),
+        array(
+            array('text' => '📅 טבלת מובילים - שבועי', 'callback_data' => 'menu_leaderboard_weekly'),
+        ),
+    );
+
+    $markup = array('inline_keyboard' => $keyboard);
+
+    // Send message (using regular bot_message for compatibility)
+    bot_message($chat_id, $message, $markup);
+}
+
+/**
+ * Send message with markdown parsing support
+ */
+function bot_message_with_markdown($chat_id, $msg, $markup = null) {
+    global $API_URL;
+
+    $msg = urlencode($msg);
+    $url = "sendMessage?chat_id=".$chat_id."&text=".$msg."&parse_mode=Markdown";
+
+    if ($markup != null) {
+        $markup = json_encode($markup);
+        $markup = urlencode($markup);
+        $url .= "&reply_markup=".$markup;
+    }
+
+    return bot($url);
+}
+
 function forwardMessage($user_id,$message_id,$from_chat_id){
 
     bot("forwardMessage?chat_id=".$user_id."&from_chat_id=".$from_chat_id."&message_id=".$message_id);
@@ -610,6 +676,271 @@ function updateUserPoints($userId, $questionId, $actionType) {
 }
 
 /////////////////////////////////////////////////////////////////////////
+///              LEADERBOARD FUNCTIONS                               ////
+/////////////////////////////////////////////////////////////////////////
+
+/**
+ * Show all-time leaderboard (top 10 + user position)
+ */
+function showLeaderboardAllTime() {
+    global $db, $user_id, $chat_id;
+
+    $safe_user_id = intval($user_id);
+
+    // Get top 10 users
+    $query = "SELECT id, nickname, overall_points 
+              FROM users 
+              WHERE nickname IS NOT NULL AND overall_points > 0
+              ORDER BY overall_points DESC, id ASC
+              LIMIT 10";
+    $result = mysqli_query($db, $query);
+
+    $message = "🏆 טבלת המובילים - כל הזמנים\n\n";
+
+    $topUsers = array();
+    $userInTop10 = false;
+    $position = 1;
+
+    while ($row = mysqli_fetch_assoc($result)) {
+        $topUsers[] = $row;
+        if ($row['id'] == $safe_user_id) {
+            $userInTop10 = true;
+        }
+    }
+    mysqli_free_result($result);
+
+    // Display top 10
+    foreach ($topUsers as $idx => $user) {
+        $rank = $idx + 1;
+        $medal = '';
+        if ($rank == 1) $medal = '🥇';
+        elseif ($rank == 2) $medal = '🥈';
+        elseif ($rank == 3) $medal = '🥉';
+        else $medal = "{$rank}.";
+
+        $isYou = ($user['id'] == $safe_user_id) ? " *← אתה!*" : "";
+        $message .= "{$medal} {$user['nickname']} - {$user['overall_points']} נקודות{$isYou}\n";
+    }
+
+    // If user not in top 10, show their position
+    if (!$userInTop10) {
+        $query = "SELECT nickname, overall_points,
+                  (SELECT COUNT(*) + 1 FROM users WHERE overall_points > u.overall_points AND nickname IS NOT NULL) as position
+                  FROM users u
+                  WHERE id = $safe_user_id";
+        $result = mysqli_query($db, $query);
+
+        if ($result && mysqli_num_rows($result) > 0) {
+            $userRow = mysqli_fetch_assoc($result);
+            mysqli_free_result($result);
+
+            if ($userRow['nickname']) {
+                $message .= "\n━━━━━━━━━━━━━━━\n\n";
+                $message .= "📍 {$userRow['position']}. {$userRow['nickname']} - {$userRow['overall_points']} נקודות *← אתה!*\n";
+            }
+        }
+    }
+
+    // Add back button
+    $keyboard = array(
+        array(
+            array('text' => '🔙 חזרה לתפריט', 'callback_data' => 'menu_back'),
+        ),
+    );
+    $markup = array('inline_keyboard' => $keyboard);
+
+    bot_message($chat_id, $message, $markup);
+}
+
+/**
+ * Show weekly leaderboard (top 10 + user position)
+ */
+function showLeaderboardWeekly() {
+    global $db, $user_id, $chat_id;
+
+    $safe_user_id = intval($user_id);
+
+    // Get top 10 users for this week
+    $query = "SELECT pl.user_id, u.nickname, SUM(pl.points_change) as weekly_points
+              FROM point_log pl
+              JOIN users u ON pl.user_id = u.id
+              WHERE pl.timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+              AND u.nickname IS NOT NULL
+              GROUP BY pl.user_id, u.nickname
+              HAVING weekly_points > 0
+              ORDER BY weekly_points DESC, u.id ASC
+              LIMIT 10";
+    $result = mysqli_query($db, $query);
+
+    $message = "📅 טבלת המובילים - שבועי\n";
+    $message .= "_(7 ימים אחרונים)_\n\n";
+
+    $topUsers = array();
+    $userInTop10 = false;
+
+    while ($row = mysqli_fetch_assoc($result)) {
+        $topUsers[] = $row;
+        if ($row['user_id'] == $safe_user_id) {
+            $userInTop10 = true;
+        }
+    }
+    mysqli_free_result($result);
+
+    if (empty($topUsers)) {
+        bot_message($chat_id, "אין עדיין נתונים לשבוע האחרון.");
+        return;
+    }
+
+    // Display top 10
+    foreach ($topUsers as $idx => $user) {
+        $rank = $idx + 1;
+        $medal = '';
+        if ($rank == 1) $medal = '🥇';
+        elseif ($rank == 2) $medal = '🥈';
+        elseif ($rank == 3) $medal = '🥉';
+        else $medal = "{$rank}.";
+
+        $isYou = ($user['user_id'] == $safe_user_id) ? " *← אתה!*" : "";
+        $message .= "{$medal} {$user['nickname']} - {$user['weekly_points']} נקודות{$isYou}\n";
+    }
+
+    // If user not in top 10, show their position
+    if (!$userInTop10) {
+        $query = "SELECT u.nickname, weekly.points as weekly_points, weekly.position
+                  FROM users u
+                  JOIN (
+                      SELECT user_id, SUM(points_change) as points,
+                      (SELECT COUNT(DISTINCT user_id) + 1 
+                       FROM point_log pl2
+                       WHERE pl2.timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                       AND (SELECT SUM(points_change) FROM point_log WHERE user_id = pl2.user_id AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)) > 
+                           (SELECT SUM(points_change) FROM point_log WHERE user_id = pl.user_id AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY))
+                      ) as position
+                      FROM point_log pl
+                      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                      AND user_id = $safe_user_id
+                      GROUP BY user_id
+                  ) weekly ON u.id = weekly.user_id
+                  WHERE u.id = $safe_user_id";
+        $result = mysqli_query($db, $query);
+
+        if ($result && mysqli_num_rows($result) > 0) {
+            $userRow = mysqli_fetch_assoc($result);
+            mysqli_free_result($result);
+
+            if ($userRow['nickname'] && $userRow['weekly_points'] > 0) {
+                $message .= "\n━━━━━━━━━━━━━━━\n\n";
+                $message .= "📍 {$userRow['position']}. {$userRow['nickname']} - {$userRow['weekly_points']} נקודות *← אתה!*\n";
+            }
+        }
+    }
+
+    // Add back button
+    $keyboard = array(
+        array(
+            array('text' => '🔙 חזרה לתפריט', 'callback_data' => 'menu_back'),
+        ),
+    );
+    $markup = array('inline_keyboard' => $keyboard);
+
+    bot_message($chat_id, $message, $markup);
+}
+
+/**
+ * Show monthly leaderboard (top 10 + user position)
+ */
+function showLeaderboardMonthly() {
+    global $db, $user_id, $chat_id;
+
+    $safe_user_id = intval($user_id);
+
+    // Get top 10 users for this month
+    $query = "SELECT pl.user_id, u.nickname, SUM(pl.points_change) as monthly_points
+              FROM point_log pl
+              JOIN users u ON pl.user_id = u.id
+              WHERE pl.timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+              AND u.nickname IS NOT NULL
+              GROUP BY pl.user_id, u.nickname
+              HAVING monthly_points > 0
+              ORDER BY monthly_points DESC, u.id ASC
+              LIMIT 10";
+    $result = mysqli_query($db, $query);
+
+    $message = "📆 טבלת המובילים - חודשי\n";
+    $message .= "_(30 ימים אחרונים)_\n\n";
+
+    $topUsers = array();
+    $userInTop10 = false;
+
+    while ($row = mysqli_fetch_assoc($result)) {
+        $topUsers[] = $row;
+        if ($row['user_id'] == $safe_user_id) {
+            $userInTop10 = true;
+        }
+    }
+    mysqli_free_result($result);
+
+    if (empty($topUsers)) {
+        bot_message($chat_id, "אין עדיין נתונים לחודש האחרון.");
+        return;
+    }
+
+    // Display top 10
+    foreach ($topUsers as $idx => $user) {
+        $rank = $idx + 1;
+        $medal = '';
+        if ($rank == 1) $medal = '🥇';
+        elseif ($rank == 2) $medal = '🥈';
+        elseif ($rank == 3) $medal = '🥉';
+        else $medal = "{$rank}.";
+
+        $isYou = ($user['user_id'] == $safe_user_id) ? " *← אתה!*" : "";
+        $message .= "{$medal} {$user['nickname']} - {$user['monthly_points']} נקודות{$isYou}\n";
+    }
+
+    // If user not in top 10, show their position
+    if (!$userInTop10) {
+        $query = "SELECT u.nickname, monthly.points as monthly_points, monthly.position
+                  FROM users u
+                  JOIN (
+                      SELECT user_id, SUM(points_change) as points,
+                      (SELECT COUNT(DISTINCT user_id) + 1 
+                       FROM point_log pl2
+                       WHERE pl2.timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                       AND (SELECT SUM(points_change) FROM point_log WHERE user_id = pl2.user_id AND timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)) > 
+                           (SELECT SUM(points_change) FROM point_log WHERE user_id = pl.user_id AND timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY))
+                      ) as position
+                      FROM point_log pl
+                      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                      AND user_id = $safe_user_id
+                      GROUP BY user_id
+                  ) monthly ON u.id = monthly.user_id
+                  WHERE u.id = $safe_user_id";
+        $result = mysqli_query($db, $query);
+
+        if ($result && mysqli_num_rows($result) > 0) {
+            $userRow = mysqli_fetch_assoc($result);
+            mysqli_free_result($result);
+
+            if ($userRow['nickname'] && $userRow['monthly_points'] > 0) {
+                $message .= "\n━━━━━━━━━━━━━━━\n\n";
+                $message .= "📍 {$userRow['position']}. {$userRow['nickname']} - {$userRow['monthly_points']} נקודות *← אתה!*\n";
+            }
+        }
+    }
+
+    // Add back button
+    $keyboard = array(
+        array(
+            array('text' => '🔙 חזרה לתפריט', 'callback_data' => 'menu_back'),
+        ),
+    );
+    $markup = array('inline_keyboard' => $keyboard);
+
+    bot_message($chat_id, $message, $markup);
+}
+
+
 
 function recordAnswer($qid, $type){
     // type can be: 1-correct, 2-wrong, 3-bad

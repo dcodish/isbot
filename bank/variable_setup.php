@@ -51,10 +51,14 @@ if (array_key_exists('callback_query', $update)) {
             writeLog(4);
             $question = $pieces[1];
             recordAnswer($question, 3);
+            // Show next question after reporting bad
+            showNextQ();
         } break;
 
         case 'skip' : {
             writeLog(3);
+            // Show next question after skip
+            showNextQ();
         } break;
 
         case 'skipSQ' :{  //user did not want to answer SQ
@@ -64,6 +68,9 @@ if (array_key_exists('callback_query', $update)) {
             #bot_message($chat_id,$sql);
             $result = mysqli_query($db,$sql);
             writeLog(13);
+
+            // Show next regular question after skipping survey
+            showNextQ();
         } break;
 
         case 'Q' : {
@@ -97,6 +104,9 @@ if (array_key_exists('callback_query', $update)) {
                 $stat = "$ans \n $stat";
             }
             bot_message($chat_id,$stat);
+
+            // Show next question automatically
+            showNextQ();
         } break;
 
         case 'SQ' : { //user answered a survey question
@@ -109,6 +119,35 @@ if (array_key_exists('callback_query', $update)) {
             writeLog(12);
             $msg="תודה על התשובה הכנה - זה מאוד יעזור למחקר הנערך לגבי הבוט"; 
             bot_message($chat_id,$msg);
+
+            // Show next regular question after survey
+            showNextQ();
+        } break;
+
+        case 'menu_start': {
+            // User clicked "Start Playing" from menu
+            showNextQ();
+        } break;
+
+
+        case 'menu_leaderboard_all': {
+            // User clicked "All-Time Leaderboard" from menu
+            showLeaderboardAllTime();
+        } break;
+
+        case 'menu_leaderboard_monthly': {
+            // User clicked "Monthly Leaderboard" from menu
+            showLeaderboardMonthly();
+        } break;
+
+        case 'menu_leaderboard_weekly': {
+            // User clicked "Weekly Leaderboard" from menu
+            showLeaderboardWeekly();
+        } break;
+
+        case 'menu_back': {
+            // User clicked "Back to Menu" button
+            showMainMenu($chat_id);
         } break;
 
 

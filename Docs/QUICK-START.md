@@ -71,10 +71,14 @@ Listening for messages... (Press Ctrl+C to stop)
 
 | Command | Description |
 |---------|-------------|
-| `/start` | Get a new quiz question |
+| `/start` | Show main menu |
+| `/menu` or `/תפריט` | Show main menu with all options |
 | `/stat` | View your statistics (answered, success rate) |
 | `/level` | Check your current level and explanation |
 | `/clearstat` | Reset all your progress |
+| `/leaderboard` | View all-time leaderboard |
+| `/leaderboard_weekly` | View weekly leaderboard |
+| `/leaderboard_monthly` | View monthly leaderboard |
 
 ---
 
@@ -250,6 +254,12 @@ Your Telegram quiz bot is fully configured and ready to use!
 
 ---
 
-**Last Updated**: December 27, 2025
+**Last Updated**: January 2, 2026  
 **Status**: ✅ Verified Working
+
+**Recent Fixes**:
+- ✅ Survey questions now continue to next regular question
+- ✅ Menu system shows proper buttons without user stats
+- ✅ Quiz flow continues automatically after all question types
+
 

@@ -78,9 +78,15 @@ switch ($text) {
             exit;
         }
 
-        // User has nickname - show question
-        showNextQ();
+        // User has nickname - show menu
+        showMainMenu($chat_id);
 
+    } break;
+
+    case '/menu':
+    case '/תפריט': {
+        // Show main menu
+        showMainMenu($chat_id);
     } break;
 
     case '/stat' : {
@@ -144,9 +150,23 @@ switch ($text) {
         showNextQ();
     } break;
 
-    case '/leaderboard' : {
-        // Show top 10 players on leaderboard
-        showLeaderboard($chat_id, 10);
+    case '/leaderboard':
+    case '/leaderboard_all':
+    case '/טבלה': {
+        // Show all-time leaderboard
+        showLeaderboardAllTime();
+    } break;
+
+    case '/leaderboard_weekly':
+    case '/טבלה_שבועי': {
+        // Show weekly leaderboard
+        showLeaderboardWeekly();
+    } break;
+
+    case '/leaderboard_monthly':
+    case '/טבלה_חודשי': {
+        // Show monthly leaderboard
+        showLeaderboardMonthly();
     } break;
 
     case '/changenickname' : {
@@ -160,7 +180,11 @@ switch ($text) {
 
    
     default :{
-        showNextQ();
+        // Only show question if this is NOT a callback
+        // Callbacks are already handled in variable_setup.php
+        if ($text !== 'callback') {
+            showNextQ();
+        }
     }
  }
 http_response_code(200);
