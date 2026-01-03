@@ -80,6 +80,51 @@ Listening for messages... (Press Ctrl+C to stop)
 | `/leaderboard_weekly` | View weekly leaderboard |
 | `/leaderboard_monthly` | View monthly leaderboard |
 
+## 🎨 Get Sticker File ID
+
+Want to use stickers in your bot? Simply **send any sticker** to @ISQ_devA_bot and it will reply with:
+- 📋 **File ID** (use this to send the sticker via bot API)
+- 🔑 **Unique ID** 
+- 😊 **Emoji** associated with the sticker
+- 📦 **Sticker Set Name**
+
+**Example:**
+1. Send any sticker to the bot
+2. Bot replies with formatted info including the file_id
+3. Copy the file_id and use it in your code!
+
+---
+
+## 🏅 Badge System
+
+The bot includes a comprehensive badge/achievement system!
+
+### Features:
+- 🎖️ **17 unique badges** to earn
+- 🎁 **Sticker notifications** when you earn a badge (11 with stickers ready!)
+- 💰 **Bonus points** for earning badges
+- 📊 **Progress tracking** for streak badges
+- 🏆 **Badges Room** - view your collection from the main menu
+
+### Badge Categories:
+- **Progress & Mastery**: first_steps, getting_serious, knowledge_builder, course_master
+- **Accuracy & Streaks**: accuracy_ace, flawless_streak, hard_mode_hero  
+- **Consistency**: daily_learner, weekly_warrior, daily_grind
+- **Level Badges**: level_1 through level_4
+- **Special**: nickname_chosen, never_quit, still_standing, never_give_up, late_night_scholar, early_bird
+
+### View Your Badges:
+1. Go to main menu (`/menu`)
+2. Click "🏅 אוסף התגים שלי" (My Badge Collection)
+3. See earned badges with dates and emojis
+4. Browse available badges to earn
+5. Check your progress (X out of Y badges)
+
+### Setup Badge Stickers:
+See `bank/BADGE_STICKERS_README.md` for complete guide on adding sticker file IDs to badges.
+
+---
+
 ---
 
 ## 📊 How It Works
@@ -254,12 +299,15 @@ Your Telegram quiz bot is fully configured and ready to use!
 
 ---
 
-**Last Updated**: January 2, 2026  
+**Last Updated**: January 3, 2026  
 **Status**: ✅ Verified Working
 
 **Recent Fixes**:
 - ✅ Survey questions now continue to next regular question
 - ✅ Menu system shows proper buttons without user stats
 - ✅ Quiz flow continues automatically after all question types
+- ✅ Sticker file ID detector - send any sticker to get its file_id
+- ✅ Badge system with sticker support (11 badges ready!)
+- ✅ Badges Room - view your earned and available badges from menu
 
 

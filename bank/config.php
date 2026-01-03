@@ -2,6 +2,9 @@
 //////////////////////////CONNECT TO DATABASE ////////////////////
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
+// Include BadgeService class
+require_once __DIR__ . '/BadgeService.php';
+
 //$db = mysqli_connect(
 //    getenv('DB_HOST'),
 //    getenv('DB_USER'),

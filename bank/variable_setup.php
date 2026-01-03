@@ -17,6 +17,30 @@ if (!is_array($update)) {
     $update = [];
 }
 
+// Extract update_id for deduplication
+$update_id = isset($update['update_id']) ? intval($update['update_id']) : 0;
+
+// Check if we already processed this update
+if ($update_id > 0) {
+    $safe_update_id = intval($update_id);
+    $check_query = "SELECT 1 FROM processed_updates WHERE update_id = $safe_update_id LIMIT 1";
+    $check_result = mysqli_query($db, $check_query);
+
+    if ($check_result && mysqli_num_rows($check_result) > 0) {
+        // Already processed this update
+        mysqli_free_result($check_result);
+        http_response_code(200);
+        echo 'OK';
+        mysqli_close($db);
+        exit;
+    }
+    if ($check_result) mysqli_free_result($check_result);
+
+    // Mark this update as processed
+    $insert_query = "INSERT INTO processed_updates (update_id, processed_at) VALUES ($safe_update_id, NOW())";
+    mysqli_query($db, $insert_query);
+}
+
 // init defaults so later code can rely on defined vars
 $chat_id = $user_id = $message_id = 0;
 $text = '';
@@ -30,7 +54,7 @@ if (array_key_exists('message', $update)) {
     $chat_id = $update['message']['chat']['id'];
     $user_id = $chat_id; //since all bot messages are  private - chatid is the same as userid
     $message_id = $update['message']['message_id'];
-    $text = $update['message']['text'];
+    $text = $update['message']['text'] ?? '';
     $first_name = $update['message']['from']['first_name'];
     //$caption = $update['message']['caption'];
 
@@ -92,18 +116,51 @@ if (array_key_exists('callback_query', $update)) {
             if ($answer=="Correct") {
                 writeLog(1,$pieces[1]);
                 $ans = "תשובה נכונה";
-                recordAnswer($pieces[1], 1);
+                $badgeCheck = recordAnswer($pieces[1], 1);
                 $stat = "אחוז התשובות הנכונות לשאלה זו הוא: ". round($percent,1)."%";
                 $stat = "$ans \n $stat";
 
             } else {
                 $ans = "טעות - התשובה הנכונה היא: ".$pieces[5];
                 writeLog(2,$pieces[1]);
-                recordAnswer($pieces[1], 2);
+                $badgeCheck = recordAnswer($pieces[1], 2);
                 $stat = "אחוז התשובות הנכונות לשאלה זו (לא כולל הפדיחה שלך) היה: ". round($percent,1)."%";
                 $stat = "$ans \n $stat";
             }
+
+            // Send answer feedback FIRST
             bot_message($chat_id,$stat);
+
+            // NOW check badges AFTER answer message
+            if ($badgeCheck === 'check_correct_badges') {
+                $badgeService = new BadgeService($db, $user_id, $chat_id);
+                $badgeService->checkCorrectAnswerBadges();
+
+                // Also check level badges if user leveled up
+                $levelUpQuery = "SELECT level FROM users WHERE id = $user_id";
+                $levelResult = mysqli_query($db, $levelUpQuery);
+                if ($levelResult && mysqli_num_rows($levelResult) > 0) {
+                    $levelRow = mysqli_fetch_assoc($levelResult);
+                    $currentLevel = $levelRow['level'];
+                    mysqli_free_result($levelResult);
+
+                    // Check if this was a level up moment (CurrentRun would be 0)
+                    $runQuery = "SELECT CurrentRun FROM users WHERE id = $user_id";
+                    $runResult = mysqli_query($db, $runQuery);
+                    if ($runResult && mysqli_num_rows($runResult) > 0) {
+                        $runRow = mysqli_fetch_assoc($runResult);
+                        if ($runRow['CurrentRun'] == 0) {
+                            // Just leveled up, check level badges
+                            $badgeService->checkLevelBadge($currentLevel);
+                            $badgeService->checkComebackBadge();
+                        }
+                        mysqli_free_result($runResult);
+                    }
+                }
+            } elseif ($badgeCheck === 'check_wrong_badges') {
+                $badgeService = new BadgeService($db, $user_id, $chat_id);
+                $badgeService->checkWrongAnswerBadges();
+            }
 
             // Show next question automatically
             showNextQ();
@@ -143,6 +200,11 @@ if (array_key_exists('callback_query', $update)) {
         case 'menu_leaderboard_weekly': {
             // User clicked "Weekly Leaderboard" from menu
             showLeaderboardWeekly();
+        } break;
+
+        case 'menu_badges': {
+            // User clicked "My Badges" from menu
+            showBadgesRoom();
         } break;
 
         case 'menu_back': {

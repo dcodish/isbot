@@ -95,6 +95,9 @@ function showMainMenu($chat_id) {
             array('text' => '🎮 התחל לשחק', 'callback_data' => 'menu_start'),
         ),
         array(
+            array('text' => '🏅 אוסף התגים שלי', 'callback_data' => 'menu_badges'),
+        ),
+        array(
             array('text' => '🏆 טבלת מובילים - כל הזמנים', 'callback_data' => 'menu_leaderboard_all'),
         ),
         array(
@@ -676,6 +679,106 @@ function updateUserPoints($userId, $questionId, $actionType) {
 }
 
 /////////////////////////////////////////////////////////////////////////
+///              BADGES ROOM FUNCTION                                ////
+/////////////////////////////////////////////////////////////////////////
+
+/**
+ * Show user's badge collection
+ */
+function showBadgesRoom() {
+    global $db, $user_id, $chat_id;
+
+    $safe_user_id = intval($user_id);
+
+    // Get user's earned badges with sticker info
+    $query = "SELECT b.badge_id, b.badge_name, b.badge_title_he, b.badge_description_he, 
+                     b.badge_emoji, b.badge_type, b.sticker_file_id, ub.earned_at
+              FROM user_badges ub
+              JOIN badges b ON ub.badge_id = b.badge_id
+              WHERE ub.user_id = $safe_user_id AND b.is_active = 1
+              ORDER BY ub.earned_at DESC";
+
+    $result = mysqli_query($db, $query);
+    $earned_badges = [];
+    $earned_count = 0;
+
+    if ($result) {
+        while ($row = mysqli_fetch_assoc($result)) {
+            $earned_badges[] = $row;
+            $earned_count++;
+        }
+        mysqli_free_result($result);
+    }
+
+    // Get total active badges count
+    $query = "SELECT COUNT(*) as total FROM badges WHERE is_active = 1";
+    $result = mysqli_query($db, $query);
+    $total_badges = 0;
+    if ($result && mysqli_num_rows($result) > 0) {
+        $row = mysqli_fetch_assoc($result);
+        $total_badges = intval($row['total']);
+        mysqli_free_result($result);
+    }
+
+    // Build message
+    $message = "🏅 אוסף התגים שלך\n\n";
+    $message .= "צברת {$earned_count} מתוך {$total_badges} תגים! 🎉\n\n";
+
+    if ($earned_count > 0) {
+        $message .= "━━━━━━━━━━━━━━━━\n";
+        $message .= "✨ התגים שלך:\n\n";
+
+        foreach ($earned_badges as $badge) {
+            $emoji = $badge['badge_emoji'] ?: '🏆';
+            $date = date('d/m/Y', strtotime($badge['earned_at']));
+            $message .= "{$emoji} <b>{$badge['badge_title_he']}</b>\n";
+            $message .= "   {$badge['badge_description_he']}\n";
+            $message .= "   📅 התקבל: {$date}\n\n";
+        }
+    } else {
+        $message .= "עדיין לא צברת תגים. 😔\n";
+        $message .= "התחל לענות על שאלות כדי לזכות בתגים!\n\n";
+    }
+
+    // Get some unearned badges as goals
+    $query = "SELECT b.badge_id, b.badge_name, b.badge_title_he, b.badge_description_he, 
+                     b.badge_emoji, b.points_reward
+              FROM badges b
+              WHERE b.is_active = 1 
+              AND b.badge_id NOT IN (
+                  SELECT badge_id FROM user_badges WHERE user_id = $safe_user_id
+              )
+              ORDER BY b.points_reward ASC
+              LIMIT 5";
+
+    $result = mysqli_query($db, $query);
+    $unearned_badges = [];
+
+    if ($result) {
+        while ($row = mysqli_fetch_assoc($result)) {
+            $unearned_badges[] = $row;
+        }
+        mysqli_free_result($result);
+    }
+
+    // Add back button
+    $keyboard = array(
+        array(
+            array('text' => '🔙 חזרה לתפריט', 'callback_data' => 'menu_back'),
+        ),
+    );
+
+    $markup = array('inline_keyboard' => $keyboard);
+
+    // Send message with HTML formatting
+    $message = urlencode($message);
+    $markup_json = json_encode($markup);
+    $markup_encoded = urlencode($markup_json);
+
+    bot("sendMessage?chat_id={$chat_id}&text={$message}&parse_mode=HTML&reply_markup={$markup_encoded}");
+}
+
+/////////////////////////////////////////////////////////////////////////
 ///              LEADERBOARD FUNCTIONS                               ////
 /////////////////////////////////////////////////////////////////////////
 
@@ -1059,12 +1162,16 @@ function recordAnswer($qid, $type){
                 $query = "Update users set level=".$level. " WHERE id=".$user_id ;
                 $result = mysqli_query($db, $query);	
                 $query = "Update users set CurrentRun=0 WHERE id=".$user_id ;
-                $result = mysqli_query($db, $query);	
+                $result = mysqli_query($db, $query);
 
+                // Badge check will happen after answer message
             } else {
                 $query = "Update users set CurrentRun=".$currentRun. " WHERE id=".$user_id ;
                 $result = mysqli_query($db, $query);	
             }
+
+            // Return flag to check badges after answer message is sent
+            return 'check_correct_badges';
 
         } break;
 	    case 2: { //wrong answer 
@@ -1090,9 +1197,16 @@ function recordAnswer($qid, $type){
                     $result = mysqli_query($db, $query);
                 }
             }
+
+            // Return flag to check badges after answer message is sent
+            return 'check_wrong_badges';
+
         } break;
   
     }
+
+    // Default return if no badge checks needed
+    return null;
 }
 
 function GetQsoFar() {
@@ -1280,6 +1394,7 @@ function updateNickname($user_id, $nickname) {
  * Processes the nickname and sends appropriate response
  */
 function handleNicknameInput($user_id, $chat_id, $text) {
+    global $db;
     $proposed_nickname = trim($text);
 
     // Validate and update
@@ -1292,6 +1407,10 @@ function handleNicknameInput($user_id, $chat_id, $text) {
         $message .= "עכשיו תוכל להשתמש בבוט. שלח /start כדי להתחיל!";
         bot_message($chat_id, $message);
         writeLog(14, 0); // Log nickname set action
+
+        // Award nickname_chosen badge
+        $badgeService = new BadgeService($db, $user_id, $chat_id);
+        $badgeService->checkWelcomeBadge();
     } else {
         // Error handling
         if ($result['error'] == 'invalid_format') {

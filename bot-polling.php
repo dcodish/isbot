@@ -69,10 +69,19 @@ while (true) {
                 if (isset($update['message'])) {
                     $user_id = $update['message']['from']['id'];
                     $first_name = $update['message']['from']['first_name'];
-                    $text = $update['message']['text'] ?? '';
-                    echo "   👤 User: $first_name ($user_id)\n";
-                    echo "   💬 Message: $text\n";
-                    echo "   ✅ Processed successfully!\n";
+
+                    // Check if it's a sticker
+                    if (isset($update['message']['sticker'])) {
+                        $sticker_file_id = $update['message']['sticker']['file_id'];
+                        echo "   👤 User: $first_name ($user_id)\n";
+                        echo "   🎨 Sticker: $sticker_file_id\n";
+                        echo "   ✅ Processed successfully!\n";
+                    } else {
+                        $text = $update['message']['text'] ?? '';
+                        echo "   👤 User: $first_name ($user_id)\n";
+                        echo "   💬 Message: $text\n";
+                        echo "   ✅ Processed successfully!\n";
+                    }
                 } elseif (isset($update['callback_query'])) {
                     $user_id = $update['callback_query']['from']['id'];
                     $first_name = $update['callback_query']['from']['first_name'];
