@@ -5,13 +5,21 @@
 echo "🤖 Starting Bot in Polling Mode...\n";
 echo "=====================================\n\n";
 
-include 'bank/config.php';
-include 'bank/bot_functions.php';
+require_once __DIR__ . '/bank/config.php';
+require_once __DIR__ . '/bank/bot_functions.php';
 global $db, $API_URL;
 
-echo "✅ Bot Token: " . TOKEN . "\n";
 echo "✅ Database: Connected\n";
-echo "✅ Bot Username: @ISQ_devA_bot\n\n";
+if ($username_bot !== '') {
+    echo "✅ Bot Username: @$username_bot\n";
+}
+echo "\n";
+
+if (TOKEN === '') {
+    echo "❌ BOT_TOKEN is not configured.\n";
+    echo "Create bank/.env from bank/.env.example and add your Telegram bot token.\n";
+    exit(1);
+}
 
 echo "Listening for messages... (Press Ctrl+C to stop)\n";
 echo "=====================================\n\n";

@@ -1,13 +1,13 @@
 <?php
 
-include 'config.php';
-include 'bot_functions.php';
-include 'admin/backend/database.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/bot_functions.php';
+require_once __DIR__ . '/admin/backend/database.php';
 global $db, $lastSQ;
 
 $input = file_get_contents('php://input');
 if (DEBUG==="ON") {
-    file_put_contents("result.txt", $input . PHP_EOL . PHP_EOL, FILE_APPEND);
+    file_put_contents(RESULT_LOG_PATH, $input . PHP_EOL . PHP_EOL, FILE_APPEND);
 }
 
 

@@ -1,12 +1,13 @@
 <?php
 session_start();
+require_once __DIR__ . '/../config.php';
+
 if (isset($_POST['submit'])) {
     $username = $_POST['username'];
     $password = $_POST['password'];
 
-    // Replace with your actual username and password for authentication
-    $valid_username = 'dcodish';
-    $valid_password = 'd891066';
+    $valid_username = env_value('ADMIN_USERNAME', 'admin');
+    $valid_password = env_value('ADMIN_PASSWORD', 'change-me');
 
     if ($username === $valid_username && $password === $valid_password) {
         $_SESSION['loggedin'] = true;

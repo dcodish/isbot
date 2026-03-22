@@ -1,0 +1,11 @@
+.idea/
+
+# Local runtime and environment files
+bank/.env
+bank/.env.local
+bank/result.txt
+bank/runtime/*.log
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
