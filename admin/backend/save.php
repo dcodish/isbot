@@ -9,7 +9,7 @@ if(count($_POST)>0){
 		$o3=$_POST['option3'];
         $o4=$_POST['option4'];
         $ans=$_POST['ans'];
-		$sql = "INSERT INTO `questions`( `question_text`, `option1`, `option2`, `option3`, `option4`, `ans`) 
+		$sql = "INSERT INTO `questions`( `question_text`, `option1`, `option2`, `option3`, `option4`, `correctans`) 
 		VALUES ('$q','$o1','$o2','$o3','$o4','$ans')";
 		if (mysqli_query($conn, $sql)) {
 			echo json_encode(array("statusCode"=>200));
@@ -30,7 +30,7 @@ if(count($_POST)>0){
         $o3=$_POST['option3'];
         $o4=$_POST['option4'];
         $ans=$_POST['ans'];
-		$sql = "UPDATE `questions` SET `question_text`='$q',`option1`='$o1',`option3`='$o2',`option3`='$o3'
+		$sql = "UPDATE `questions` SET `question_text`='$q',`option1`='$o1',`option2`='$o2',`option3`='$o3'
             ,`option4`='$o4' ,`correctans`='$ans' WHERE id=$id";
 		if (mysqli_query($conn, $sql)) {
 			echo json_encode(array("statusCode"=>200));

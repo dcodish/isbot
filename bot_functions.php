@@ -20,7 +20,6 @@ function NewBot($chatID, $messaggio, $markup=null) {
         CURLOPT_TIMEOUT => 8
     ]);
     $result = curl_exec($ch);
-    curl_close($ch);
     usleep(50000);
     return $result;
 }
@@ -42,10 +41,8 @@ function bot($data){
     $res = curl_exec($ch);
     if ($res === false) {
         error_log('Telegram call failed: '.$API_URL.$data . ' - Error: ' . curl_error($ch));
-        curl_close($ch);
         return null;
     }
-    curl_close($ch);
     return json_decode($res, true);
 }
 
@@ -232,7 +229,7 @@ function getQuestion() {
     $query = "SELECT level FROM users WHERE id = $safe_user_id";
     $result = mysqli_query($db, $query);
     $fetch = mysqli_fetch_assoc($result);
-    $level = intval($fetch['level']);
+    $level = isset($fetch['level']) ? intval($fetch['level']) : 1;
     mysqli_free_result($result);
 
     $query = null;

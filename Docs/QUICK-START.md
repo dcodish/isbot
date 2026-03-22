@@ -123,6 +123,4 @@ If the bot does not respond:
 
 ## Important Notes
 
-- The repository no longer stores live secrets in tracked documentation or config files
-- Full live Telegram testing still requires a valid local bot token
 - The admin login should be configured through environment variables, not hardcoded in source files

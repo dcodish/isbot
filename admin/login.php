@@ -1,6 +1,12 @@
 <?php
 session_start();
-require_once __DIR__ . '/../config.php';
+try {
+    require_once __DIR__ . '/../config.php';
+} catch (Exception $e) {
+    die("<h1>Configuration Error</h1><p>" . $e->getMessage() . "</p><p>Check if MySQL is running and .env has correct DB credentials.</p>");
+} catch (Error $e) {
+    die("<h1>Fatal Error</h1><p>" . $e->getMessage() . "</p>");
+}
 
 if (isset($_POST['submit'])) {
     $username = $_POST['username'];

@@ -1,7 +1,10 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 session_start();
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
-    header('Location: login.php');
+    header('Location: /admin/login.php');
     exit();
 }
 
@@ -110,11 +113,11 @@ include 'backend/database.php';
 					<div class="modal-body">					
 						<div class="form-group">
 							<label>שאלה</label>
-							<input type="question_text" id="question" name="question" class="form-control" required>
+							<input type="text" id="question" name="question" class="form-control" required>
 						</div>
 						<div class="form-group">
 							<label>אפשרות א</label>
-							<input type="data-o1" id="data-o1" name="data-o1" class="form-control" required>
+							<input type="text" id="data-o1" name="option1" class="form-control" required>
 						</div>
 						<div class="form-group">
 							<label>אפשרות ב</label>
