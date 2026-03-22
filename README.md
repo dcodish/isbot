@@ -1,52 +1,123 @@
-# Telegram Quiz Bot Final Project
+# Gamified Telegram Quiz Bot Quick Start - IEM Final Project
 
-This repository contains my final project work on top of an existing Telegram quiz bot codebase. I extended the original project with new bot features, improved the quiz flow, and reorganized the repository so it is easier to review and safer to share.
+This repository contains a Telegram quiz bot project that we extended for our IEM final project submission. The bot is based on a previous bot made by Dr. David Codish. The project includes an admin area, leaderboard features, nickname support, and a badge system.
 
-## What I Added
+## Prerequisites
 
-- A badge and achievement system with progress tracking and Telegram notifications
-- A menu-based user flow with leaderboard and stats features
-- Nickname onboarding and profile-related improvements
-- Better project organization for configuration, runtime files, and maintenance scripts
+- PHP with `mysqli` extension
+- MySQL with the bots database and tables set up
+- Composer dependencies available under `vendor/`
+- A Telegram bot token for live bot testing
 
-## Main Structure
+## One-Time Setup
+
+1. Clone the repository and navigate to the project root.
+2. Install project dependencies with Composer if not already done:
+
+```powershell
+composer install
+``` 
+
+3. Create a local environment file:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+4. Edit `.env` with your local values:
+
+- `DB_HOST`
+- `DB_USER`
+- `DB_PASS`
+- `DB_NAME`
+- `BOT_TOKEN`
+- `BOT_USERNAME`
+- `BOT_ID`
+- `BOT_ADMIN_USER_ID`
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+
+## Start The Project
+
+Run both commands from the repository root on two different terminal windows:
+
+Terminal 1:
+
+```powershell
+php -S localhost:8000
+```
+
+Terminal 2:
+
+```powershell
+php bot-polling.php
+```
+
+## Main Flow
+
+```text
+Telegram user message
+    -> bot-polling.php
+    -> index.php
+    -> variable_setup.php
+    -> bot_functions.php / BadgeService.php
+    -> MySQL + Telegram API response
+```
+
+## Main Commands
+
+| Command | Description |
+| --- | --- |
+| `/start` | Start the bot and open the main flow |
+| `/menu` | Show the main menu |
+| `/stat` | Show user statistics |
+| `/level` | Show the current level |
+| `/clearstat` | Reset user progress |
+| `/leaderboard` | Show the all-time leaderboard |
+| `/leaderboard_weekly` | Show the weekly leaderboard |
+| `/leaderboard_monthly` | Show the monthly leaderboard |
+
+## File Structure
 
 ```text
 .
 ├── README.md
-├── Docs/
-│   └── QUICK-START.md
+├── Docs/QUICK-START.md
 ├── bot-polling.php
-├── admin/              # Admin panel
-├── bootstrap/          # Shared app bootstrap and configuration loading
-├── runtime/            # Local runtime logs (not tracked)
-├── tools/              # Import/export maintenance scripts
-├── BadgeService.php    # Badge and achievement service
-├── bot_functions.php   # Core bot helper logic
-├── config.php          # Compatibility entry for shared bootstrap
-├── index.php           # Main webhook/polling request entry
-├── variable_setup.php  # Request parsing and callback handling
-└── export*.php         # Compatibility wrappers to `tools/`
+├── admin/
+├── bootstrap/
+├── runtime/
+├── tools/
+├── config.php
+├── index.php
+├── variable_setup.php
+├── bot_functions.php
+└── BadgeService.php
 ```
 
-## How To Review
+Notes:
 
-Start with these files if you want to understand the project quickly:
+- `bootstrap/` contains shared environment and database bootstrapping
+- `tools/` contains maintenance scripts for import/export tasks
+- `runtime/` is for local debug logs and should not be shared as project output
+- legacy top-level script paths were preserved where practical for compatibility
 
-- `bot-polling.php` for the local polling runner
-- `index.php` for the main request flow
-- `bootstrap/app.php` for environment loading and database setup
-- `bot_functions.php` and `BadgeService.php` for the core bot features
-- `Docs/QUICK-START.md` for setup and usage notes
+## Gamification Features Added:
 
-## Running The Project
+- Badge and achievement support
+- Menu-based navigation and leaderboard views
+- Nickname onboarding and related user-flow improvements
 
-The repository is organized to stay easy to run locally, but live Telegram usage still requires a valid bot token and local database credentials.
+## Troubleshooting
 
-Setup steps are documented in `Docs/QUICK-START.md`.
+If the bot does not respond:
 
-## Submission Notes
+1. Confirm the PHP server is running on port `8000`
+2. Confirm the polling script is still running
+3. Confirm `.env` contains a valid `BOT_TOKEN`
+4. Confirm the database credentials in `.env` match your local MySQL setup
+5. If debug mode is enabled, inspect logs under `runtime/`
 
-- Sensitive values should live only in `.env`, which is ignored by git
-- Runtime logs are written under `runtime/` and are not tracked
-- Legacy file paths were preserved where reasonable so existing entry points still work
+## Important Notes
+
+- The admin login should be configured through environment variables, not hardcoded in source files
