@@ -5,13 +5,21 @@
 echo "🤖 Starting Bot in Polling Mode...\n";
 echo "=====================================\n\n";
 
-include 'bank/config.php';
-include 'bank/bot_functions.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/bot_functions.php';
 global $db, $API_URL;
 
-echo "✅ Bot Token: " . TOKEN . "\n";
 echo "✅ Database: Connected\n";
-echo "✅ Bot Username: @ISQ_devA_bot\n\n";
+if (isset($username_bot) && $username_bot !== '') {
+    echo "✅ Bot Username: @$username_bot\n";
+}
+echo "\n";
+
+if (TOKEN === '') {
+    echo "❌ BOT_TOKEN is not configured.\n";
+    echo "Create .env from .env.example and add your Telegram bot token.\n";
+    exit(1);
+}
 
 echo "Listening for messages... (Press Ctrl+C to stop)\n";
 echo "=====================================\n\n";
@@ -24,7 +32,7 @@ while (true) {
     $response = @file_get_contents($url);
 
     if ($response === false) {
-        echo "⚠️  Connection error, retrying...\n";
+        echo "⚠️  Connection error, retryinsg...\n";
         sleep(5);
         continue;
     }
@@ -47,7 +55,7 @@ while (true) {
             $jsonUpdate = json_encode($update);
 
             // Call index.php via HTTP to process it (same as webhook)
-            $ch = curl_init('http://localhost:8000/bank/index.php');
+            $ch = curl_init('http://localhost:8000/index.php');
             curl_setopt_array($ch, [
                 CURLOPT_POST => true,
                 CURLOPT_POSTFIELDS => $jsonUpdate,
@@ -62,7 +70,6 @@ while (true) {
 
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
 
             if ($httpCode == 200) {
                 // Extract message info

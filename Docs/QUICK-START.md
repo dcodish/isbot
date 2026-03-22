@@ -1,313 +1,126 @@
-# 🚀 Telegram Quiz Bot - Quick Start Guide
+# Telegram Quiz Bot Quick Start
 
-**Bot**: @ISQ_devA_bot | **Database**: bot (MySQL) | **Mode**: Polling (Development)
+This repository contains a Telegram quiz bot project that I extended for my final project submission. The project can run locally in polling mode and includes an admin area, leaderboard features, nickname support, and a badge system.
 
----
+## Prerequisites
 
-## 📋 Prerequisites
+- PHP with `mysqli`
+- MySQL with a local database for the bot
+- Composer dependencies available under `vendor/`
+- A Telegram bot token for live bot testing
 
-- ✅ PHP installed (with mysqli extension)
-- ✅ MySQL running (localhost, database: `bot`)
-- ✅ Composer dependencies installed (`bank/vendor/`)
+## One-Time Setup
 
----
+1. Clone the repository and navigate to the project root.
+2. Install project dependencies with Composer if not already done:
 
-## 🚀 START BOT (2 Simple Steps)
-
-### Step 1: Start PHP Server
-
-**Run in terminal:**
 ```powershell
-cd C:\Users\ASUS\PhpstormProjects\test
+composer install
+``` 
+
+3. Create a local environment file:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+4. Edit `.env` with your local values:
+
+- `DB_HOST`
+- `DB_USER`
+- `DB_PASS`
+- `DB_NAME`
+- `BOT_TOKEN`
+- `BOT_USERNAME`
+- `BOT_ID`
+- `BOT_ADMIN_USER_ID`
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+
+3. Make sure your MySQL schema and seed data are available locally.
+
+## Start The Project
+
+Run both commands from the repository root.
+
+Terminal 1:
+
+```powershell
 php -S localhost:8000
 ```
 
-✅ **Keep this terminal window open!**
+Terminal 2:
 
-⚠️ **Important**: Run from `test/` directory, NOT `test/bank/`
-
----
-
-### Step 2: Start Polling Bot
-
-**Run in NEW terminal:**
 ```powershell
-cd C:\Users\ASUS\PhpstormProjects\test
 php bot-polling.php
 ```
 
-**You'll see:**
-```
-🤖 Starting Bot in Polling Mode...
-✅ Bot Token: 8210054669:AAGiinrx5q8Yoqgv6jheae6XGCgUf_5d4dM
-✅ Database: Connected
-✅ Bot Username: @ISQ_devA_bot
+## Main Flow
 
-Listening for messages... (Press Ctrl+C to stop)
-```
-
-✅ **Bot is now running!**
-
----
-
-## 📱 TEST YOUR BOT
-
-1. Open **Telegram** (mobile or desktop)
-2. Search: **`@ISQ_devA_bot`**
-3. Click **START** or send: **`/start`**
-4. **Bot responds with a quiz question!** 🎉
-
-**In polling terminal you'll see:**
-```
-📩 [18:xx:xx] Received update #194533557
-   👤 User: Adi (1671626997)
-   💬 Message: /start
-   ✅ Processed successfully!
+```text
+Telegram user message
+    -> bot-polling.php
+    -> index.php
+    -> variable_setup.php
+    -> bot_functions.php / BadgeService.php
+    -> MySQL + Telegram API response
 ```
 
----
-
-## 🎮 Bot Commands
+## Main Commands
 
 | Command | Description |
-|---------|-------------|
-| `/start` | Show main menu |
-| `/menu` or `/תפריט` | Show main menu with all options |
-| `/stat` | View your statistics (answered, success rate) |
-| `/level` | Check your current level and explanation |
-| `/clearstat` | Reset all your progress |
-| `/leaderboard` | View all-time leaderboard |
-| `/leaderboard_weekly` | View weekly leaderboard |
-| `/leaderboard_monthly` | View monthly leaderboard |
+| --- | --- |
+| `/start` | Start the bot and open the main flow |
+| `/menu` | Show the main menu |
+| `/stat` | Show user statistics |
+| `/level` | Show the current level |
+| `/clearstat` | Reset user progress |
+| `/leaderboard` | Show the all-time leaderboard |
+| `/leaderboard_weekly` | Show the weekly leaderboard |
+| `/leaderboard_monthly` | Show the monthly leaderboard |
 
-## 🎨 Get Sticker File ID
+## Submission-Oriented Structure
 
-Want to use stickers in your bot? Simply **send any sticker** to @ISQ_devA_bot and it will reply with:
-- 📋 **File ID** (use this to send the sticker via bot API)
-- 🔑 **Unique ID** 
-- 😊 **Emoji** associated with the sticker
-- 📦 **Sticker Set Name**
-
-**Example:**
-1. Send any sticker to the bot
-2. Bot replies with formatted info including the file_id
-3. Copy the file_id and use it in your code!
-
----
-
-## 🏅 Badge System
-
-The bot includes a comprehensive badge/achievement system!
-
-### Features:
-- 🎖️ **17 unique badges** to earn
-- 🎁 **Sticker notifications** when you earn a badge (11 with stickers ready!)
-- 💰 **Bonus points** for earning badges
-- 📊 **Progress tracking** for streak badges
-- 🏆 **Badges Room** - view your collection from the main menu
-
-### Badge Categories:
-- **Progress & Mastery**: first_steps, getting_serious, knowledge_builder, course_master
-- **Accuracy & Streaks**: accuracy_ace, flawless_streak, hard_mode_hero  
-- **Consistency**: daily_learner, weekly_warrior, daily_grind
-- **Level Badges**: level_1 through level_4
-- **Special**: nickname_chosen, never_quit, still_standing, never_give_up, late_night_scholar, early_bird
-
-### View Your Badges:
-1. Go to main menu (`/menu`)
-2. Click "🏅 אוסף התגים שלי" (My Badge Collection)
-3. See earned badges with dates and emojis
-4. Browse available badges to earn
-5. Check your progress (X out of Y badges)
-
-### Setup Badge Stickers:
-See `bank/BADGE_STICKERS_README.md` for complete guide on adding sticker file IDs to badges.
-
----
-
----
-
-## 📊 How It Works
-
-```
-User sends /start
-    ↓
-bot-polling.php checks Telegram API for new messages
-    ↓
-Gets update from Telegram
-    ↓
-Sends to index.php (localhost:8000/bank/index.php)
-    ↓
-variable_setup.php parses message
-    ↓
-index.php processes /start command
-    ↓
-Checks user in database
-    ↓
-Calls showNextQ() → queries 531 questions
-    ↓
-Sends question with 4 answer buttons
-    ↓
-User receives question!
+```text
+.
+├── README.md
+├── Docs/QUICK-START.md
+├── bot-polling.php
+├── admin/
+├── bootstrap/
+├── runtime/
+├── tools/
+├── config.php
+├── index.php
+├── variable_setup.php
+├── bot_functions.php
+└── BadgeService.php
 ```
 
----
+Notes:
 
-## 🔧 Configuration
+- `bootstrap/` contains shared environment and database bootstrapping
+- `tools/` contains maintenance scripts for import/export tasks
+- `runtime/` is for local debug logs and should not be shared as project output
+- legacy top-level script paths were preserved where practical for compatibility
 
-### Database (MySQL)
-- **Host**: localhost
-- **User**: root
-- **Password**: 5400
-- **Database**: bot
-- **Tables**: users (1,555), questions (531), user_q, user_survey
+## What I Added
 
-Configuration file: `bank/config.php`
+- Badge and achievement support
+- Menu-based navigation and leaderboard views
+- Nickname onboarding and related user-flow improvements
+- Better repository hygiene and project organization for submission
 
-### Bot Settings
-- **Token**: 8210054669:AAGiinrx5q8Yoqgv6jheae6XGCgUf_5d4dM
-- **Username**: @ISQ_devA_bot
-- **Bot ID**: 8210054669
-- **Admin User**: 1671626997
-- **Debug Mode**: ON (logs to `bank/result.txt`)
+## Troubleshooting
 
----
+If the bot does not respond:
 
-## 📁 Project Structure
+1. Confirm the PHP server is running on port `8000`
+2. Confirm the polling script is still running
+3. Confirm `.env` contains a valid `BOT_TOKEN`
+4. Confirm the database credentials in `.env` match your local MySQL setup
+5. If debug mode is enabled, inspect logs under `runtime/`
 
-```
-test/
-├── bot-polling.php              # Polling bot (checks for messages)
-└── bank/
-    ├── index.php                # Main bot logic (/start, /stat, etc.)
-    ├── variable_setup.php       # Parses incoming messages
-    ├── config.php               # Configuration (DB, token)
-    ├── bot_functions.php        # Helper functions
-    ├── result.txt               # Debug log (incoming messages)
-    ├── admin/                   # Admin panel
-    │   └── backend/
-    │       └── database.php     # DB connection
-    └── vendor/                  # PHP dependencies
-```
+## Important Notes
 
----
-
-## 🐛 Troubleshooting
-
-### Bot Not Responding?
-
-**Check 1: PHP Server Running?**
-```powershell
-netstat -ano | findstr :8000
-# Should show process on port 8000
-```
-
-**Check 2: Polling Bot Running?**
-Look for terminal with "Listening for messages..."
-
-**Check 3: Database Connected?**
-```powershell
-php -r "try { mysqli_connect('localhost','root','5400','bot'); echo 'Connected'; } catch(Exception $e) { echo 'Failed: '.$e->getMessage(); }"
-```
-
-**Check 4: View Logs**
-Check `bank/result.txt` for incoming messages
-
-**Check 5: Port Already in Use?**
-```powershell
-# Find process using port 8000
-netstat -ano | findstr :8000
-
-# Kill it
-taskkill /F /PID <process_id>
-```
-
----
-
-## 🔄 Stop/Restart Bot
-
-### To Stop:
-- Press **Ctrl+C** in polling bot terminal
-- Press **Ctrl+C** in PHP server terminal
-
-### To Restart:
-1. Stop both terminals (Ctrl+C)
-2. Restart PHP server: `php -S localhost:8000`
-3. Restart polling bot: `php bot-polling.php`
-
----
-
-## 📝 Development Notes
-
-### Why Polling Instead of Webhook?
-- ✅ No ngrok needed
-- ✅ No public URL required
-- ✅ No webhook "400 Bad Request" errors
-- ✅ Perfect for local development
-- ✅ Simple to start/stop
-
-### Debug Mode
-All incoming messages are logged to `bank/result.txt` when DEBUG is ON
-
-### Testing Changes
-After changing code:
-1. Stop polling bot (Ctrl+C)
-2. Restart it: `php bot-polling.php`
-3. PHP server doesn't need restart (unless config changed)
-
----
-
-## 🎯 Quick Reference
-
-### Start Everything:
-```powershell
-# Terminal 1:
-cd C:\Users\ASUS\PhpstormProjects\test
-php -S localhost:8000
-
-# Terminal 2 (NEW):
-cd C:\Users\ASUS\PhpstormProjects\test
-php bot-polling.php
-```
-
-### Test Bot:
-Message **@ISQ_devA_bot** with `/start`
-
-### Check if Working:
-- Look at polling terminal for "Processed successfully"
-- Check `bank/result.txt` for logged messages
-- See response in Telegram
-
----
-
-## ✅ Quick Checklist
-
-Before messaging the bot:
-- [ ] PHP server running on localhost:8000
-- [ ] Polling bot running (shows "Listening for messages...")
-- [ ] MySQL database `bot` accessible
-- [ ] Telegram app open
-- [ ] Ready to send `/start` to @ISQ_devA_bot
-
----
-
-## 🎉 You're Ready!
-
-Your Telegram quiz bot is fully configured and ready to use!
-
-**Just run the 2 commands above and message the bot!** 🚀
-
----
-
-**Last Updated**: January 3, 2026  
-**Status**: ✅ Verified Working
-
-**Recent Fixes**:
-- ✅ Survey questions now continue to next regular question
-- ✅ Menu system shows proper buttons without user stats
-- ✅ Quiz flow continues automatically after all question types
-- ✅ Sticker file ID detector - send any sticker to get its file_id
-- ✅ Badge system with sticker support (11 badges ready!)
-- ✅ Badges Room - view your earned and available badges from menu
-
-
+- The admin login should be configured through environment variables, not hardcoded in source files

@@ -1,0 +1,11 @@
+.idea/
+
+# Local runtime and environment files
+.env
+.env.local
+result.txt
+runtime/*.log
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
