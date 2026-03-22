@@ -1,11 +1,11 @@
-# Telegram Quiz Bot Quick Start
+# Gamified Telegram Quiz Bot Quick Start - IEM Final Project
 
-This repository contains a Telegram quiz bot project that I extended for my final project submission. The project can run locally in polling mode and includes an admin area, leaderboard features, nickname support, and a badge system.
+This repository contains a Telegram quiz bot project that we extended for our IEM final project submission. The bot is based on a previous bot made by Dr. David Codish. The project includes an admin area, leaderboard features, nickname support, and a badge system.
 
 ## Prerequisites
 
-- PHP with `mysqli`
-- MySQL with a local database for the bot
+- PHP with `mysqli` extension
+- MySQL with the bots database and tables set up
 - Composer dependencies available under `vendor/`
 - A Telegram bot token for live bot testing
 
@@ -37,11 +37,9 @@ Copy-Item .env.example .env
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD`
 
-3. Make sure your MySQL schema and seed data are available locally.
-
 ## Start The Project
 
-Run both commands from the repository root.
+Run both commands from the repository root on two different terminal windows:
 
 Terminal 1:
 
@@ -79,7 +77,7 @@ Telegram user message
 | `/leaderboard_weekly` | Show the weekly leaderboard |
 | `/leaderboard_monthly` | Show the monthly leaderboard |
 
-## Submission-Oriented Structure
+## File Structure
 
 ```text
 .
@@ -104,12 +102,11 @@ Notes:
 - `runtime/` is for local debug logs and should not be shared as project output
 - legacy top-level script paths were preserved where practical for compatibility
 
-## What I Added
+## Gamification Features Added:
 
 - Badge and achievement support
 - Menu-based navigation and leaderboard views
 - Nickname onboarding and related user-flow improvements
-- Better repository hygiene and project organization for submission
 
 ## Troubleshooting
 
