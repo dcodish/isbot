@@ -17,17 +17,16 @@ This repository contains my final project work on top of an existing Telegram qu
 ├── Docs/
 │   └── QUICK-START.md
 ├── bot-polling.php
-└── bank/
-    ├── admin/              # Admin panel
-    ├── bootstrap/          # Shared app bootstrap and configuration loading
-    ├── runtime/            # Local runtime logs (not tracked)
-    ├── tools/              # Import/export maintenance scripts
-    ├── BadgeService.php    # Badge and achievement service
-    ├── bot_functions.php   # Core bot helper logic
-    ├── config.php          # Compatibility entry for shared bootstrap
-    ├── index.php           # Main webhook/polling request entry
-    ├── variable_setup.php  # Request parsing and callback handling
-    └── export*.php         # Compatibility wrappers to `bank/tools/`
+├── admin/              # Admin panel
+├── bootstrap/          # Shared app bootstrap and configuration loading
+├── runtime/            # Local runtime logs (not tracked)
+├── tools/              # Import/export maintenance scripts
+├── BadgeService.php    # Badge and achievement service
+├── bot_functions.php   # Core bot helper logic
+├── config.php          # Compatibility entry for shared bootstrap
+├── index.php           # Main webhook/polling request entry
+├── variable_setup.php  # Request parsing and callback handling
+└── export*.php         # Compatibility wrappers to `tools/`
 ```
 
 ## How To Review
@@ -35,9 +34,9 @@ This repository contains my final project work on top of an existing Telegram qu
 Start with these files if you want to understand the project quickly:
 
 - `bot-polling.php` for the local polling runner
-- `bank/index.php` for the main request flow
-- `bank/bootstrap/app.php` for environment loading and database setup
-- `bank/bot_functions.php` and `bank/BadgeService.php` for the core bot features
+- `index.php` for the main request flow
+- `bootstrap/app.php` for environment loading and database setup
+- `bot_functions.php` and `BadgeService.php` for the core bot features
 - `Docs/QUICK-START.md` for setup and usage notes
 
 ## Running The Project
@@ -48,6 +47,6 @@ Setup steps are documented in `Docs/QUICK-START.md`.
 
 ## Submission Notes
 
-- Sensitive values should live only in `bank/.env`, which is ignored by git
-- Runtime logs are written under `bank/runtime/` and are not tracked
+- Sensitive values should live only in `.env`, which is ignored by git
+- Runtime logs are written under `runtime/` and are not tracked
 - Legacy file paths were preserved where reasonable so existing entry points still work

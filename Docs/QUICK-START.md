@@ -6,18 +6,25 @@ This repository contains a Telegram quiz bot project that I extended for my fina
 
 - PHP with `mysqli`
 - MySQL with a local database for the bot
-- Composer dependencies available under `bank/vendor/`
+- Composer dependencies available under `vendor/`
 - A Telegram bot token for live bot testing
 
 ## One-Time Setup
 
-1. Create a local environment file:
+1. Clone the repository and navigate to the project root.
+2. Install project dependencies with Composer if not already done:
 
 ```powershell
-Copy-Item bank/.env.example bank/.env
+composer install
+``` 
+
+3. Create a local environment file:
+
+```powershell
+Copy-Item .env.example .env
 ```
 
-2. Edit `bank/.env` with your local values:
+4. Edit `.env` with your local values:
 
 - `DB_HOST`
 - `DB_USER`
@@ -53,9 +60,9 @@ php bot-polling.php
 ```text
 Telegram user message
     -> bot-polling.php
-    -> bank/index.php
-    -> bank/variable_setup.php
-    -> bank/bot_functions.php / bank/BadgeService.php
+    -> index.php
+    -> variable_setup.php
+    -> bot_functions.php / BadgeService.php
     -> MySQL + Telegram API response
 ```
 
@@ -79,23 +86,22 @@ Telegram user message
 ├── README.md
 ├── Docs/QUICK-START.md
 ├── bot-polling.php
-└── bank/
-    ├── admin/
-    ├── bootstrap/
-    ├── runtime/
-    ├── tools/
-    ├── config.php
-    ├── index.php
-    ├── variable_setup.php
-    ├── bot_functions.php
-    └── BadgeService.php
+├── admin/
+├── bootstrap/
+├── runtime/
+├── tools/
+├── config.php
+├── index.php
+├── variable_setup.php
+├── bot_functions.php
+└── BadgeService.php
 ```
 
 Notes:
 
-- `bank/bootstrap/` contains shared environment and database bootstrapping
-- `bank/tools/` contains maintenance scripts for import/export tasks
-- `bank/runtime/` is for local debug logs and should not be shared as project output
+- `bootstrap/` contains shared environment and database bootstrapping
+- `tools/` contains maintenance scripts for import/export tasks
+- `runtime/` is for local debug logs and should not be shared as project output
 - legacy top-level script paths were preserved where practical for compatibility
 
 ## What I Added
@@ -111,9 +117,9 @@ If the bot does not respond:
 
 1. Confirm the PHP server is running on port `8000`
 2. Confirm the polling script is still running
-3. Confirm `bank/.env` contains a valid `BOT_TOKEN`
-4. Confirm the database credentials in `bank/.env` match your local MySQL setup
-5. If debug mode is enabled, inspect logs under `bank/runtime/`
+3. Confirm `.env` contains a valid `BOT_TOKEN`
+4. Confirm the database credentials in `.env` match your local MySQL setup
+5. If debug mode is enabled, inspect logs under `runtime/`
 
 ## Important Notes
 
