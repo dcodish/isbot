@@ -89,7 +89,7 @@ switch ($text) {
         showMainMenu($chat_id);
     } break;
 
-    case '/stat' : {
+    case '/stats' : {
 
         //get total number of questions in bank
 
@@ -125,7 +125,7 @@ switch ($text) {
         showNextQ();
     } break;
 
-    case '/clearstat' : {
+    case '/clearstats' : {
         $query = "delete from user_q where userid=" . $user_id;
         $result = mysqli_query($db, $query);
         $query = "update users set level=1 where id=" . $user_id;
