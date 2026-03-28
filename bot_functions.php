@@ -24,8 +24,6 @@ function NewBot($chatID, $messaggio, $markup=null) {
     return $result;
 }
 
-
-
 function bot($data){
     global $API_URL;
     $ch = curl_init($API_URL.$data);
