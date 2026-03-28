@@ -26,9 +26,6 @@ function NewBot($chatID, $messaggio, $markup=null) {
 
 
 
-
-
-
 function bot($data){
     global $API_URL;
     $ch = curl_init($API_URL.$data);
@@ -818,8 +815,8 @@ function showLeaderboardAllTime() {
         elseif ($rank == 3) $medal = '🥉';
         else $medal = "{$rank}.";
 
-        $isYou = ($user['id'] == $safe_user_id) ? " *← אתה!*" : "";
-        $message .= "{$medal} {$user['nickname']} - {$user['overall_points']} נקודות{$isYou}\n";
+        $isYou = ($user['id'] == $safe_user_id) ? "← YOU!" : "";
+        $message .= "{$medal} {$user['nickname']} - {$user['overall_points']} Points{$isYou}\n\n";
     }
 
     // If user not in top 10, show their position
@@ -836,7 +833,7 @@ function showLeaderboardAllTime() {
 
             if ($userRow['nickname']) {
                 $message .= "\n━━━━━━━━━━━━━━━\n\n";
-                $message .= "📍 {$userRow['position']}. {$userRow['nickname']} - {$userRow['overall_points']} נקודות *← אתה!*\n";
+                $message .= "📍 {$userRow['position']}. {$userRow['nickname']} - {$userRow['overall_points']} נקודות ← אתה!\n";
             }
         }
     }
@@ -848,6 +845,7 @@ function showLeaderboardAllTime() {
         ),
     );
     $markup = array('inline_keyboard' => $keyboard);
+    $message  .= ".";
 
     bot_message($chat_id, $message, $markup);
 }
@@ -873,7 +871,7 @@ function showLeaderboardWeekly() {
     $result = mysqli_query($db, $query);
 
     $message = "📅 טבלת המובילים - שבועי\n";
-    $message .= "_(7 ימים אחרונים)_\n\n";
+    $message .= "(7 ימים אחרונים)\n\n";
 
     $topUsers = array();
     $userInTop10 = false;
@@ -900,8 +898,8 @@ function showLeaderboardWeekly() {
         elseif ($rank == 3) $medal = '🥉';
         else $medal = "{$rank}.";
 
-        $isYou = ($user['user_id'] == $safe_user_id) ? " *← אתה!*" : "";
-        $message .= "{$medal} {$user['nickname']} - {$user['weekly_points']} נקודות{$isYou}\n";
+        $isYou = ($user['user_id'] == $safe_user_id) ? " ← YOU!" : "";
+        $message .= "{$medal} {$user['nickname']} - {$user['weekly_points']} Points{$isYou}\n";
     }
 
     // If user not in top 10, show their position
@@ -942,6 +940,7 @@ function showLeaderboardWeekly() {
         ),
     );
     $markup = array('inline_keyboard' => $keyboard);
+    $message  .= ".";
 
     bot_message($chat_id, $message, $markup);
 }
@@ -967,7 +966,7 @@ function showLeaderboardMonthly() {
     $result = mysqli_query($db, $query);
 
     $message = "📆 טבלת המובילים - חודשי\n";
-    $message .= "_(30 ימים אחרונים)_\n\n";
+    $message .= "(30 ימים אחרונים)\n\n";
 
     $topUsers = array();
     $userInTop10 = false;
@@ -994,8 +993,8 @@ function showLeaderboardMonthly() {
         elseif ($rank == 3) $medal = '🥉';
         else $medal = "{$rank}.";
 
-        $isYou = ($user['user_id'] == $safe_user_id) ? " *← אתה!*" : "";
-        $message .= "{$medal} {$user['nickname']} - {$user['monthly_points']} נקודות{$isYou}\n";
+        $isYou = ($user['user_id'] == $safe_user_id) ? " ← YOU!" : "";
+        $message .= "{$medal} {$user['nickname']} - {$user['monthly_points']} Points{$isYou}\n";
     }
 
     // If user not in top 10, show their position
@@ -1024,7 +1023,7 @@ function showLeaderboardMonthly() {
 
             if ($userRow['nickname'] && $userRow['monthly_points'] > 0) {
                 $message .= "\n━━━━━━━━━━━━━━━\n\n";
-                $message .= "📍 {$userRow['position']}. {$userRow['nickname']} - {$userRow['monthly_points']} נקודות *← אתה!*\n";
+                $message .= "📍 {$userRow['position']}. {$userRow['nickname']} - {$userRow['monthly_points']} נקודות ← אתה!\n";
             }
         }
     }
@@ -1036,6 +1035,7 @@ function showLeaderboardMonthly() {
         ),
     );
     $markup = array('inline_keyboard' => $keyboard);
+    $message  .= ".";
 
     bot_message($chat_id, $message, $markup);
 }
@@ -1294,7 +1294,7 @@ function setAwaitingNickname($user_id, $awaiting = true) {
 function askForNickname($chat_id) {
     $message = "🎮 ברוכים הבאים לבוט הקורס יסודות מערכות מידע!\n\n";
     $message .= "כדי להצטרף, אנא בחר כינוי ייחודי.\n\n";
-    $message .= "📋 *כללים:*\n";
+    $message .= "📋 כללים:\n";
     $message .= "• 3-15 תווים\n";
     $message .= "• אותיות באנגלית, מספרים וקו תחתון בלבד\n";
     $message .= "אנא שלח את הכינוי שלך:";
@@ -1399,7 +1399,7 @@ function handleNicknameInput($user_id, $chat_id, $text) {
 
     if ($result['success']) {
         // Success!
-        $message = "✅ *הכינוי נקבע בהצלחה!*\n\n";
+        $message = "✅ הכינוי נקבע בהצלחה!\n\n";
         $message .= "הכינוי שלך: `$proposed_nickname`\n\n";
         $message .= "עכשיו תוכל להשתמש בבוט. שלח /start כדי להתחיל!";
         bot_message($chat_id, $message);
@@ -1411,7 +1411,7 @@ function handleNicknameInput($user_id, $chat_id, $text) {
     } else {
         // Error handling
         if ($result['error'] == 'invalid_format') {
-            $message = "❌ *פורמט כינוי לא תקין!*\n\n";
+            $message = "❌ פורמט כינוי לא תקין!\n\n";
             $message .= "הכינוי שלך חייב:\n";
             $message .= "• להיות באורך 3-15 תווים\n";
             $message .= "• להכיל רק אותיות אנגליות, מספרים וקו תחתון\n\n";
@@ -1419,7 +1419,7 @@ function handleNicknameInput($user_id, $chat_id, $text) {
             $message .= "אנא נסה שוב:";
             bot_message($chat_id, $message);
         } elseif ($result['error'] == 'already_taken') {
-            $message = "❌ *הכינוי כבר תפוס!*\n\n";
+            $message = "❌ הכינוי כבר תפוס!\n\n";
             $message .= "מישהו אחר כבר משתמש בכינוי `$proposed_nickname`.\n\n";
             $message .= "אנא בחר כינוי אחר:";
             bot_message($chat_id, $message);
