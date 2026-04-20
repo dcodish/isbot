@@ -136,17 +136,41 @@ switch ($text) {
     } break;
 
     case '/level' : {
-        $query = "select level,current_run from users where id=" . intval($user_id);
+        $safe_uid = intval($user_id);
+        $query = "select level,current_run from users where id=$safe_uid";
         $result = mysqli_query($db, $query);
         $fetch = mysqli_fetch_assoc($result);
         $level = intval($fetch['level']);
         $currentRun = intval($fetch['current_run']);
+
+        // Threshold for next-level progress line
+        $upgradeAt = null;
+        $gRes = mysqli_query($db, "SELECT upgrade_at FROM gamification WHERE level = " . intval($level));
+        if ($gRes && mysqli_num_rows($gRes) > 0) {
+            $gRow = mysqli_fetch_assoc($gRes);
+            $upgradeAt = intval($gRow['upgrade_at']);
+            mysqli_free_result($gRes);
+        }
+
         $rlm = "\u{200F}";
         // LRI/PDI isolate numeric tokens so minus + digits stay as "-1", not "1-"
         $lri = "\u{2066}"; $pdi = "\u{2069}";
         $msg  = $rlm . "📊 הרמה שלך\n\n";
         $msg .= $rlm . "🎯 רמה נוכחית: {$lri}{$level}{$pdi}\n";
-        $msg .= $rlm . "📈 ציון בתוך השלב: {$lri}{$currentRun}{$pdi}\n\n";
+        $msg .= $rlm . "📈 ציון בתוך השלב: {$lri}{$currentRun}{$pdi}\n";
+
+        // Progress-to-next-level line. Level 4 is the cap (upgrade_at is set to a
+        // large sentinel value in the gamification table), so treat it as "maxed".
+        if ($level >= 4) {
+            $msg .= $rlm . "🏆 אתה ברמה הגבוהה ביותר!\n\n";
+        } elseif ($upgradeAt !== null) {
+            $needed = max(0, $upgradeAt - $currentRun);
+            $next = $level + 1;
+            $msg .= $rlm . "🚀 עוד {$lri}{$needed}{$pdi} תשובות נכונות לעלייה לשלב {$lri}{$next}{$pdi}\n\n";
+        } else {
+            $msg .= "\n";
+        }
+
         $msg .= $rlm . "━━━━━━━━━━━━━━\n";
         $msg .= $rlm . "הסבר על הרמות:\n";
         $msg .= $rlm . "1️⃣ כל השאלות רנדומליות וקלות\n";
