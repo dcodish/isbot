@@ -90,38 +90,32 @@ switch ($text) {
     } break;
 
     case '/stats' : {
+        $safe_uid = intval($user_id);
 
-        //get total number of questions in bank
-
-        $query = "SELECT count(id) as totalQ FROM questions";
+        $query = "SELECT COUNT(*) AS totalAnswered, COALESCE(SUM(numofsuccess),0) AS okCount, COALESCE(SUM(numoffailure),0) AS wrongCount FROM user_q WHERE userid = $safe_uid";
         $result = mysqli_query($db, $query);
-        $row= mysqli_fetch_assoc($result);
-        $totalQuestionsInBank = $row['totalQ'];
+        $row = mysqli_fetch_assoc($result);
+        $uniqueQuestionsSeen = intval($row['totalAnswered']);
+        $ok = intval($row['okCount']);
+        $wrong = intval($row['wrongCount']);
+        $totalAttempts = $ok + $wrong;
 
-        //get total number of questions the user tried to answer, success and failures
-        $query = "SELECT count(*) as totalAnswered, sum(numofsuccess) as successfullAnswers, sum(numoffailure) as failedAnswers FROM user_q WHERE userid=" . $user_id;
-        $result = mysqli_query($db, $query);
-        $row= mysqli_fetch_assoc($result);
-        $totalQuestionsAsked = 0;
-        $totalSuccess =  0;
-        $totalFailure =  0;
-        if ($row['totalAnswered'] == 0) {
-            $totalQuestionsAsked = 1;
-            $totalSuccess =  0;
-            $totalFailure =  0;
+        $rlm = "\u{200F}";
+        $lri = "\u{2066}"; $pdi = "\u{2069}";
+
+        $msg  = $rlm . "📊 הסטטיסטיקות שלך\n\n";
+        $msg .= $rlm . "📝 שאלות שנחשפת אליהן: {$lri}{$uniqueQuestionsSeen}{$pdi}\n";
+        if ($totalAttempts > 0) {
+            $percent = round(100 * $ok / $totalAttempts, 0);
+            $msg .= $rlm . "🎯 אחוז הצלחה: {$lri}{$percent}%{$pdi}\n";
+        } else {
+            $msg .= $rlm . "🎯 אחוז הצלחה: —\n";
         }
-        else {
-            $totalQuestionsAsked = $row['totalAnswered'];
-            $totalSuccess =  $row['successfullAnswers'];
-            $totalFailure =  $row['failedAnswers'];
-        }
+        $msg .= $rlm . "🆔 מספר משתמש בטלגרם: {$lri}{$safe_uid}{$pdi}\n\n";
+        $msg .= $rlm . "━━━━━━━━━━━━━━\n";
+        $msg .= $rlm . "💡 רוצה להתחיל מחדש? שלח /clearstats — ההיסטוריה תאופס (התגים והנקודות יישמרו).";
 
-
-        //get total number of questions
-        bot_message($chat_id,'מספר שאלות שנחשפת אליהם עד כה הוא: '.$totalQuestionsAsked);
-        $percent = 100*$totalSuccess/($totalFailure+$totalSuccess);
-        bot_message($chat_id,'אחוז ההצלחה שלך הוא: '.round($percent,0)."%");
-        bot_message($chat_id,'מספר משתמש בטלגרם: '.$user_id);
+        bot_message($chat_id, $msg);
         showNextQ();
     } break;
 
