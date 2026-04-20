@@ -1,6 +1,6 @@
 <?php
 
-// variable_setup.php already includes config.php, bot_functions.php, and admin/backend/database.php
+// variable_setup.php already includes bootstrap/app.php, bot_functions.php, and admin/backend/database.php
 include 'variable_setup.php';
 global $db, $chat_id, $user_id;
 
@@ -55,7 +55,7 @@ switch ($text) {
 
         if ($num == 0) {
             // New user - create account
-            $query = "INSERT INTO users (id,first_name,last_name, level, CurrentRun) VALUES ('" . $user_id . "','" . $first_name . "','" . $last_name . "', 1,1)";
+            $query = "INSERT INTO users (id,first_name,last_name, level, current_run) VALUES ('" . $user_id . "','" . $first_name . "','" . $last_name . "', 1,1)";
             mysqli_query($db, $query);
 
             // Ask for nickname immediately for new users
@@ -130,17 +130,17 @@ switch ($text) {
         $result = mysqli_query($db, $query);
         $query = "update users set level=1 where id=" . $user_id;
         $result = mysqli_query($db, $query);
-        $query = "update users set CurrentRun=0 where id=" . $user_id;
+        $query = "update users set current_run=0 where id=" . $user_id;
         $result = mysqli_query($db, $query);
         bot_message($chat_id,"כל הסטוריית התשובות שלך נמחקה וחזרת לשלב 1");
     } break;
 
     case '/level' : {
-        $query = "select level,CurrentRun from users where id=" . $user_id;
+        $query = "select level,current_run from users where id=" . $user_id;
         $result = mysqli_query($db, $query);
         $fetch = mysqli_fetch_assoc($result);
         $level = $fetch['level'];
-        $currentRun = $fetch['CurrentRun'];
+        $currentRun = $fetch['current_run'];
         bot_message($chat_id,"השלב הנוכחי הוא : ".$level." והציון בתוך השלב הוא: ".$currentRun);
 
         bot_message($chat_id,"שלב 1 - כל השאלות רנדומליות וקלות");

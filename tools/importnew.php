@@ -1,5 +1,5 @@
 <?php
-require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__) . '/bootstrap/app.php';
 
 $handle = fopen(dirname(__DIR__) . '/toimportnew.txt', 'r') or die('Error reading file!');
 $i = 1;

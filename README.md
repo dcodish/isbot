@@ -2,6 +2,8 @@
 
 This repository contains a Telegram quiz bot project that we extended for our IEM final project submission. The bot is based on a previous bot made by Dr. David Codish. The project includes an admin area, leaderboard features, nickname support, and a badge system.
 
+For system design, message flow, DB schema, and feature details, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Prerequisites
 
 - PHP with `mysqli` extension
@@ -82,17 +84,16 @@ Telegram user message
 ```text
 .
 ├── README.md
-├── Docs/QUICK-START.md
+├── CLAUDE.md
 ├── bot-polling.php
-├── admin/
-├── bootstrap/
-├── runtime/
-├── tools/
-├── config.php
 ├── index.php
 ├── variable_setup.php
 ├── bot_functions.php
-└── BadgeService.php
+├── BadgeService.php
+├── admin/
+├── bootstrap/
+├── tools/
+└── runtime/
 ```
 
 Notes:
@@ -100,7 +101,6 @@ Notes:
 - `bootstrap/` contains shared environment and database bootstrapping
 - `tools/` contains maintenance scripts for import/export tasks
 - `runtime/` is for local debug logs and should not be shared as project output
-- legacy top-level script paths were preserved where practical for compatibility
 
 ## Gamification Features Added:
 

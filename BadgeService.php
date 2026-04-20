@@ -69,8 +69,13 @@ class BadgeService {
         // Award bonus points if any
         if ($badge['points_reward'] > 0) {
             $points = intval($badge['points_reward']);
-            $query = "UPDATE users SET overall_points = overall_points + $points 
+            $query = "UPDATE users SET overall_points = overall_points + $points
                       WHERE id = {$this->user_id}";
+            mysqli_query($this->db, $query);
+
+            // Also record in point_log so weekly/monthly leaderboards include badge bonuses
+            $query = "INSERT INTO point_log (user_id, question_id, action_type, question_level, points_change)
+                      VALUES ({$this->user_id}, NULL, NULL, 0, $points)";
             mysqli_query($this->db, $query);
         }
 

@@ -3,7 +3,7 @@
 
 function NewBot($chatID, $messaggio, $markup=null) {
     /*echo "sending message to " . $chatID . "\n";*/
-    global $API_URL; // uses TOKEN from config.php
+    global $API_URL; // defined in bootstrap/app.php
     $url = $API_URL . "sendMessage?chat_id=" . intval($chatID);
 
 
@@ -1131,17 +1131,17 @@ function recordAnswer($qid, $type){
     $query = "SELECT * FROM users WHERE id=".$user_id;
     $result = mysqli_query($db, $query);	
     $fetch = mysqli_fetch_assoc($result);
-    $currentRun = $fetch['CurrentRun'];
+    $currentRun = $fetch['current_run'];
     $level = $fetch['level'];
     mysqli_free_result($result);  // Free the result set
 
 
 
-    $query = "SELECT * FROM Gamification WHERE level=".$level;
+    $query = "SELECT * FROM gamification WHERE level=".$level;
     $result = mysqli_query($db, $query);	
     $fetch = mysqli_fetch_assoc($result);
-    $up = $fetch['Upgrade_at'];
-    $down = $fetch['Downgrade_at'];
+    $up = $fetch['upgrade_at'];
+    $down = $fetch['downgrade_at'];
     mysqli_free_result($result);  // Free the result set
 
 
@@ -1156,22 +1156,22 @@ function recordAnswer($qid, $type){
                 bot_message($chat_id, $msgtxt);
                 $query = "Update users set level=".$level. " WHERE id=".$user_id ;
                 $result = mysqli_query($db, $query);	
-                $query = "Update users set CurrentRun=0 WHERE id=".$user_id ;
+                $query = "Update users set current_run=0 WHERE id=".$user_id ;
                 $result = mysqli_query($db, $query);
 
                 // Badge check will happen after answer message
             } else {
-                $query = "Update users set CurrentRun=".$currentRun. " WHERE id=".$user_id ;
+                $query = "Update users set current_run=".$currentRun. " WHERE id=".$user_id ;
                 $result = mysqli_query($db, $query);	
             }
 
             // Return flag to check badges after answer message is sent
             return 'check_correct_badges';
 
-        } break;
+        }
 	    case 2: { //wrong answer 
             $currentRun--;
-            $query = "Update users set CurrentRun=".$currentRun. " WHERE id=".$user_id ;
+            $query = "Update users set current_run=".$currentRun. " WHERE id=".$user_id ;
             $result = mysqli_query($db, $query);
             if ($currentRun<$down && $level>1) {
 	           $level--;
@@ -1181,14 +1181,14 @@ function recordAnswer($qid, $type){
 
                 $query = "Update users set level=".$level. " WHERE id=".$user_id ;
                 $result = mysqli_query($db, $query);	
-                $query = "Update users set CurrentRun=0 WHERE id=".$user_id ;
+                $query = "Update users set current_run=0 WHERE id=".$user_id ;
                 $result = mysqli_query($db, $query);	
             } else {
                 if ($currentRun>-4) {
-                    $query = "Update users set CurrentRun=".$currentRun. " WHERE id=".$user_id ;
+                    $query = "Update users set current_run=".$currentRun. " WHERE id=".$user_id ;
                     $result = mysqli_query($db, $query);	
                 } else { //already in level 1 but poor shape
-                    $query = "Update users set CurrentRun=-4  WHERE id=".$user_id ;
+                    $query = "Update users set current_run=-4  WHERE id=".$user_id ;
                     $result = mysqli_query($db, $query);
                 }
             }
@@ -1196,7 +1196,7 @@ function recordAnswer($qid, $type){
             // Return flag to check badges after answer message is sent
             return 'check_wrong_badges';
 
-        } break;
+        }
   
     }
 
@@ -1399,13 +1399,16 @@ function handleNicknameInput($user_id, $chat_id, $text) {
         // Success!
         $message = "✅ הכינוי נקבע בהצלחה!\n\n";
         $message .= "הכינוי שלך: `$proposed_nickname`\n\n";
-        $message .= "עכשיו תוכל להשתמש בבוט. שלח /start כדי להתחיל!";
+        $message .= "בוא נתחיל! הנה השאלה הראשונה שלך:";
         bot_message($chat_id, $message);
         writeLog(14, 0); // Log nickname set action
 
         // Award nickname_chosen badge
         $badgeService = new BadgeService($db, $user_id, $chat_id);
         $badgeService->checkWelcomeBadge();
+
+        // Immediately serve the first question so the user knows what to do
+        showNextQ();
     } else {
         // Error handling
         if ($result['error'] == 'invalid_format') {

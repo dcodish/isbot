@@ -1,5 +1,5 @@
 <?php
-require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__) . '/bootstrap/app.php';
 
 $file_contents = file_get_contents(dirname(__DIR__) . '/new file.txt');
 $file_contents = str_replace("A) ", "", $file_contents);

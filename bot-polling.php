@@ -5,7 +5,7 @@
 echo "🤖 Starting Bot in Polling Mode...\n";
 echo "=====================================\n\n";
 
-require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/bootstrap/app.php';
 require_once __DIR__ . '/bot_functions.php';
 global $db, $API_URL;
 

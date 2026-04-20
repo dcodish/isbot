@@ -10,7 +10,7 @@ if (file_exists($vendorAutoload)) {
 }
 
 if (class_exists(\Dotenv\Dotenv::class) && file_exists($projectRoot . '/.env')) {
-    $dotenv = \Dotenv\Dotenv::createImmutable($projectRoot);
+    $dotenv = \Dotenv\Dotenv::createMutable($projectRoot);
     $dotenv->safeLoad();
 }
 
@@ -69,6 +69,8 @@ if (!defined('DEBUG')) {
 }
 
 $API_URL = TOKEN !== '' ? 'https://api.telegram.org/bot' . TOKEN . '/' : '';
+
+require_once $projectRoot . '/BadgeService.php';
 
 $channel_id = env_value('BOT_CHANNEL_ID', '');
 $username_bot = env_value('BOT_USERNAME', '');

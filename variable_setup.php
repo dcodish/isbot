@@ -1,6 +1,6 @@
 <?php
 
-require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/bootstrap/app.php';
 require_once __DIR__ . '/bot_functions.php';
 require_once __DIR__ . '/admin/backend/database.php';
 global $db, $lastSQ;
@@ -144,12 +144,12 @@ if (array_key_exists('callback_query', $update)) {
                     $currentLevel = $levelRow['level'];
                     mysqli_free_result($levelResult);
 
-                    // Check if this was a level up moment (CurrentRun would be 0)
-                    $runQuery = "SELECT CurrentRun FROM users WHERE id = $user_id";
+                    // Check if this was a level up moment (current_run would be 0)
+                    $runQuery = "SELECT current_run FROM users WHERE id = $user_id";
                     $runResult = mysqli_query($db, $runQuery);
                     if ($runResult && mysqli_num_rows($runResult) > 0) {
                         $runRow = mysqli_fetch_assoc($runResult);
-                        if ($runRow['CurrentRun'] == 0) {
+                        if ($runRow['current_run'] == 0) {
                             // Just leveled up, check level badges
                             $badgeService->checkLevelBadge($currentLevel);
                             $badgeService->checkComebackBadge();
