@@ -229,6 +229,20 @@ if (isset($update['callback_query'])) {
             showMainMenu($chat_id);
         } break;
 
+        case 'clearstats_confirm': {
+            // User confirmed clearstats — perform the reset.
+            $safe_uid = intval($user_id);
+            mysqli_query($db, "DELETE FROM user_q WHERE userid = $safe_uid");
+            mysqli_query($db, "UPDATE users SET level = 1, current_run = 0 WHERE id = $safe_uid");
+            $rlm = "\u{200F}";
+            bot_message($chat_id, $rlm . "✅ ההיסטוריה אופסה. חזרת לשלב 1 — התגים והנקודות שלך נשמרו.");
+        } break;
+
+        case 'clearstats_cancel': {
+            $rlm = "\u{200F}";
+            bot_message($chat_id, $rlm . "הפעולה בוטלה. ההיסטוריה נשמרה.");
+        } break;
+
 
         default : {
 

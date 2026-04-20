@@ -120,13 +120,23 @@ switch ($text) {
     } break;
 
     case '/clearstats' : {
-        $query = "delete from user_q where userid=" . $user_id;
-        $result = mysqli_query($db, $query);
-        $query = "update users set level=1 where id=" . $user_id;
-        $result = mysqli_query($db, $query);
-        $query = "update users set current_run=0 where id=" . $user_id;
-        $result = mysqli_query($db, $query);
-        bot_message($chat_id,"כל הסטוריית התשובות שלך נמחקה וחזרת לשלב 1");
+        // Show confirmation prompt rather than acting immediately — destructive action.
+        $rlm = "\u{200F}";
+        $msg  = $rlm . "⚠️ האם אתה בטוח שברצונך לאפס את ההיסטוריה?\n\n";
+        $msg .= $rlm . "יאופס:\n";
+        $msg .= $rlm . "• היסטוריית התשובות לכל שאלה\n";
+        $msg .= $rlm . "• הרמה הנוכחית (חזרה לשלב 1)\n";
+        $msg .= $rlm . "• הציון בתוך השלב (חזרה ל-0)\n\n";
+        $msg .= $rlm . "יישמרו:\n";
+        $msg .= $rlm . "• התגים שצברת 🏅\n";
+        $msg .= $rlm . "• הנקודות הכלליות 🏆";
+
+        $markup = ['inline_keyboard' => [[
+            ['text' => '✅ כן, אפס',  'callback_data' => 'clearstats_confirm'],
+            ['text' => '❌ ביטול',      'callback_data' => 'clearstats_cancel'],
+        ]]];
+
+        bot_message($chat_id, $msg, $markup);
     } break;
 
     case '/level' : {
