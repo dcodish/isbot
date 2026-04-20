@@ -1,5 +1,9 @@
 <?php
 
+// All date/time operations in the bot (badges, streaks, leaderboards) are interpreted
+// in Israel local time. Setting this before any date()/time() call fires.
+date_default_timezone_set('Asia/Jerusalem');
+
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 $projectRoot = dirname(__DIR__);
