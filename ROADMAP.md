@@ -182,6 +182,18 @@ Migrate raw query interpolation in `bot_functions.php` to prepared statements. T
 ### 12. Historical DATETIME Backfill (minor)
 After the timezone switch to Asia/Jerusalem, rows previously written with UTC `NOW()` into DATETIME columns display as 3 hours "earlier" than they actually occurred. Low urgency since it only affects historic audit-log reads. If and when it matters, run a one-shot `UPDATE ... = DATE_ADD(col, INTERVAL 3 HOUR)` per affected column (and handle the DST 2-hour period separately).
 
+### 13. Admin Dashboard
+A landing page for the professor at `/admin/` that surfaces the state of the system at a glance, rather than requiring SQL or drilling through separate CRUD pages. Consolidates several of the individual items below into one overview:
+- **Engagement**: total active users, new users this week, sessions this week, answers per day (sparkline), median answers per student
+- **Content health**: question bank size by lecture (feeds #6), thin-coverage warnings, reported-bad queue count
+- **Difficulty distribution**: count of questions in each success-rate band, probation-pool size (`numofanswers < 5`)
+- **Student progress snapshot**: distribution of students across levels 1–4, average `current_run`, leaderboard top-10 preview
+- **Badge distribution**: earned counts per badge type (which are chased, which are dormant)
+- **Research audit**: recent log entries (last 50 rows from the `log` table with action names), CSV export link for the full log + point_log for research
+- **Settings summary**: current_week, session_gap_minutes, semester_start (if added), with links to the unified settings page (#3a)
+- Primary widgets link to their detail pages (e.g. coverage report, question list filtered by lecture, leaderboard detail).
+Eventually this becomes the default admin landing — the existing questions-CRUD moves behind a "Manage Questions" link.
+
 ---
 
 ## Ideas Backlog
