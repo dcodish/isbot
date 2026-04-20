@@ -891,267 +891,127 @@ function showLeaderboardMenu() {
 }
 
 /**
- * Show all-time leaderboard (top 10 + user position)
+ * Render a leaderboard as a text message that blends an aspirational podium
+ * (ranks 1-3) with a local window around the current user (3 above + 3 below).
+ * See ARCHITECTURE.md § Leaderboards for the full rule set and reasoning.
+ *
+ * $entries: zero-indexed array of rows, pre-sorted high-to-low, each with keys
+ *   'id' (user id), 'nickname' (string), 'points' (int). Ranks are derived as
+ *   (array index + 1).
+ * $user_id: the viewing user's id (used to locate their row and mark "you").
+ * $title: already-formatted header text (e.g. "🏆 טבלת המובילים — כל הזמנים").
  */
+function renderLeaderboard(array $entries, $user_id, $title) {
+    $rlm = "\u{200F}";
+    $total = count($entries);
+    $user_rank = null;
+    foreach ($entries as $i => $e) {
+        if ((string)$e['id'] === (string)$user_id) { $user_rank = $i + 1; break; }
+    }
+
+    $msg = $rlm . $title . "\n";
+
+    if ($total === 0) {
+        $msg .= "\n" . $rlm . "אין עדיין משתתפים בטבלה.";
+        return $msg;
+    }
+
+    // Decide which ranks to render: podium (1..min(3,total)) ∪ user-window.
+    $show = [];
+    for ($i = 1; $i <= min(3, $total); $i++) $show[$i] = true;
+    if ($user_rank !== null) {
+        $start = max(1, $user_rank - 3);
+        $end   = min($total, $user_rank + 3);
+        for ($i = $start; $i <= $end; $i++) $show[$i] = true;
+    }
+    ksort($show);
+
+    $msg .= "\n";
+    $prev = 0;
+    foreach (array_keys($show) as $r) {
+        if ($prev > 0 && $r > $prev + 1) {
+            $msg .= $rlm . "━━━━━━━━━━━\n";
+        }
+        $e = $entries[$r - 1];
+        $medal = ($r === 1) ? '🥇' : (($r === 2) ? '🥈' : (($r === 3) ? '🥉' : "{$r}."));
+        $you   = ((string)$e['id'] === (string)$user_id) ? ' ← אתה!' : '';
+        $msg .= $rlm . "{$medal} {$e['nickname']} — {$e['points']} נקודות{$you}\n";
+        $prev = $r;
+    }
+
+    // Footer: encourages the right next step based on where the user is.
+    $msg .= "\n";
+    if ($user_rank === null) {
+        $msg .= $rlm . "עדיין לא הופעת בטבלה — ענה על שאלות כדי להיכנס!";
+    } elseif ($user_rank === 1) {
+        $msg .= $rlm . "אתה בראש הטבלה! המשך ככה 👑";
+    } else {
+        $above = $entries[$user_rank - 2]; // rank above user, 0-indexed
+        $delta = ($above['points'] - $entries[$user_rank - 1]['points']) + 1;
+        $msg .= $rlm . "נותרו {$delta} נקודות לעקוף את {$above['nickname']}";
+    }
+
+    return $msg;
+}
+
+/**
+ * Thin wrappers: fetch the full eligible list for each window and hand off to
+ * renderLeaderboard(). Eligibility rules mirror the old behaviour — nickname
+ * required, points > 0, ties broken by id ASC.
+ */
+function fetchAllTimeEntries($db) {
+    $entries = [];
+    $res = mysqli_query($db, "SELECT id, nickname, overall_points AS points
+                              FROM users
+                              WHERE nickname IS NOT NULL AND overall_points > 0
+                              ORDER BY overall_points DESC, id ASC");
+    while ($row = mysqli_fetch_assoc($res)) {
+        $entries[] = ['id' => $row['id'], 'nickname' => $row['nickname'], 'points' => (int)$row['points']];
+    }
+    if ($res) mysqli_free_result($res);
+    return $entries;
+}
+
+function fetchRollingEntries($db, $days) {
+    $d = intval($days);
+    $entries = [];
+    $res = mysqli_query($db, "SELECT u.id, u.nickname, SUM(pl.points_change) AS points
+                              FROM point_log pl
+                              JOIN users u ON pl.user_id = u.id
+                              WHERE pl.timestamp >= DATE_SUB(NOW(), INTERVAL $d DAY)
+                              AND u.nickname IS NOT NULL
+                              GROUP BY u.id, u.nickname
+                              HAVING points > 0
+                              ORDER BY points DESC, u.id ASC");
+    while ($row = mysqli_fetch_assoc($res)) {
+        $entries[] = ['id' => $row['id'], 'nickname' => $row['nickname'], 'points' => (int)$row['points']];
+    }
+    if ($res) mysqli_free_result($res);
+    return $entries;
+}
+
 function showLeaderboardAllTime() {
     global $db, $user_id, $chat_id;
-
-    $safe_user_id = intval($user_id);
-
-    // Get top 10 users
-    $query = "SELECT id, nickname, overall_points 
-              FROM users 
-              WHERE nickname IS NOT NULL AND overall_points > 0
-              ORDER BY overall_points DESC, id ASC
-              LIMIT 10";
-    $result = mysqli_query($db, $query);
-
-    $message = "🏆 טבלת המובילים - כל הזמנים\n\n";
-
-    $topUsers = array();
-    $userInTop10 = false;
-    $position = 1;
-
-    while ($row = mysqli_fetch_assoc($result)) {
-        $topUsers[] = $row;
-        if ($row['id'] == $safe_user_id) {
-            $userInTop10 = true;
-        }
-    }
-    mysqli_free_result($result);
-
-    // Display top 10
-    foreach ($topUsers as $idx => $user) {
-        $rank = $idx + 1;
-        $medal = '';
-        if ($rank == 1) $medal = '🥇';
-        elseif ($rank == 2) $medal = '🥈';
-        elseif ($rank == 3) $medal = '🥉';
-        else $medal = "{$rank}.";
-
-        $isYou = ($user['id'] == $safe_user_id) ? "← YOU!" : "";
-        $message .= "{$medal} {$user['nickname']} - {$user['overall_points']} Points{$isYou}\n\n";
-    }
-
-    // If user not in top 10, show their position
-    if (!$userInTop10) {
-        $query = "SELECT nickname, overall_points,
-                  (SELECT COUNT(*) + 1 FROM users WHERE overall_points > u.overall_points AND nickname IS NOT NULL) as position
-                  FROM users u
-                  WHERE id = $safe_user_id";
-        $result = mysqli_query($db, $query);
-
-        if ($result && mysqli_num_rows($result) > 0) {
-            $userRow = mysqli_fetch_assoc($result);
-            mysqli_free_result($result);
-
-            if ($userRow['nickname']) {
-                $message .= "\n━━━━━━━━━━━━━━━\n\n";
-                $message .= "📍 {$userRow['position']}. {$userRow['nickname']} - {$userRow['overall_points']} נקודות ← אתה!\n";
-            }
-        }
-    }
-
-    // Add back button
-    $keyboard = array(
-        array(
-            array('text' => '🔙 חזרה לתפריט', 'callback_data' => 'menu_back'),
-        ),
-    );
-    $markup = array('inline_keyboard' => $keyboard);
-    $message  .= ".";
-
-    bot_message($chat_id, $message, $markup);
+    $entries = fetchAllTimeEntries($db);
+    $msg = renderLeaderboard($entries, $user_id, "🏆 טבלת המובילים — כל הזמנים");
+    $markup = ['inline_keyboard' => [[['text' => '🔙 חזרה לתפריט', 'callback_data' => 'menu_back']]]];
+    bot_message($chat_id, $msg, $markup);
 }
 
-/**
- * Show weekly leaderboard (top 10 + user position)
- */
 function showLeaderboardWeekly() {
     global $db, $user_id, $chat_id;
-
-    $safe_user_id = intval($user_id);
-
-    // Get top 10 users for this week
-    $query = "SELECT pl.user_id, u.nickname, SUM(pl.points_change) as weekly_points
-              FROM point_log pl
-              JOIN users u ON pl.user_id = u.id
-              WHERE pl.timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-              AND u.nickname IS NOT NULL
-              GROUP BY pl.user_id, u.nickname
-              HAVING weekly_points > 0
-              ORDER BY weekly_points DESC, u.id ASC
-              LIMIT 10";
-    $result = mysqli_query($db, $query);
-
-    $message = "📅 טבלת המובילים - שבועי\n";
-    $message .= "(7 ימים אחרונים)\n\n";
-
-    $topUsers = array();
-    $userInTop10 = false;
-
-    while ($row = mysqli_fetch_assoc($result)) {
-        $topUsers[] = $row;
-        if ($row['user_id'] == $safe_user_id) {
-            $userInTop10 = true;
-        }
-    }
-    mysqli_free_result($result);
-
-    if (empty($topUsers)) {
-        bot_message($chat_id, "אין עדיין נתונים לשבוע האחרון.");
-        return;
-    }
-
-    // Display top 10
-    foreach ($topUsers as $idx => $user) {
-        $rank = $idx + 1;
-        $medal = '';
-        if ($rank == 1) $medal = '🥇';
-        elseif ($rank == 2) $medal = '🥈';
-        elseif ($rank == 3) $medal = '🥉';
-        else $medal = "{$rank}.";
-
-        $isYou = ($user['user_id'] == $safe_user_id) ? " ← YOU!" : "";
-        $message .= "{$medal} {$user['nickname']} - {$user['weekly_points']} Points{$isYou}\n";
-    }
-
-    // If user not in top 10, show their position
-    if (!$userInTop10) {
-        $query = "SELECT u.nickname, weekly.points as weekly_points, weekly.position
-                  FROM users u
-                  JOIN (
-                      SELECT user_id, SUM(points_change) as points,
-                      (SELECT COUNT(DISTINCT user_id) + 1 
-                       FROM point_log pl2
-                       WHERE pl2.timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                       AND (SELECT SUM(points_change) FROM point_log WHERE user_id = pl2.user_id AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)) > 
-                           (SELECT SUM(points_change) FROM point_log WHERE user_id = pl.user_id AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY))
-                      ) as position
-                      FROM point_log pl
-                      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                      AND user_id = $safe_user_id
-                      GROUP BY user_id
-                  ) weekly ON u.id = weekly.user_id
-                  WHERE u.id = $safe_user_id";
-        $result = mysqli_query($db, $query);
-
-        if ($result && mysqli_num_rows($result) > 0) {
-            $userRow = mysqli_fetch_assoc($result);
-            mysqli_free_result($result);
-
-            if ($userRow['nickname'] && $userRow['weekly_points'] > 0) {
-                $message .= "\n━━━━━━━━━━━━━━━\n\n";
-                $message .= "📍 {$userRow['position']}. {$userRow['nickname']} - {$userRow['weekly_points']} נקודות *← אתה!*\n";
-            }
-        }
-    }
-
-    // Add back button
-    $keyboard = array(
-        array(
-            array('text' => '🔙 חזרה לתפריט', 'callback_data' => 'menu_back'),
-        ),
-    );
-    $markup = array('inline_keyboard' => $keyboard);
-    $message  .= ".";
-
-    bot_message($chat_id, $message, $markup);
+    $entries = fetchRollingEntries($db, 7);
+    $msg = renderLeaderboard($entries, $user_id, "📅 טבלת המובילים — שבועי\n(7 ימים אחרונים)");
+    $markup = ['inline_keyboard' => [[['text' => '🔙 חזרה לתפריט', 'callback_data' => 'menu_back']]]];
+    bot_message($chat_id, $msg, $markup);
 }
 
-/**
- * Show monthly leaderboard (top 10 + user position)
- */
 function showLeaderboardMonthly() {
     global $db, $user_id, $chat_id;
-
-    $safe_user_id = intval($user_id);
-
-    // Get top 10 users for this month
-    $query = "SELECT pl.user_id, u.nickname, SUM(pl.points_change) as monthly_points
-              FROM point_log pl
-              JOIN users u ON pl.user_id = u.id
-              WHERE pl.timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-              AND u.nickname IS NOT NULL
-              GROUP BY pl.user_id, u.nickname
-              HAVING monthly_points > 0
-              ORDER BY monthly_points DESC, u.id ASC
-              LIMIT 10";
-    $result = mysqli_query($db, $query);
-
-    $message = "📆 טבלת המובילים - חודשי\n";
-    $message .= "(30 ימים אחרונים)\n\n";
-
-    $topUsers = array();
-    $userInTop10 = false;
-
-    while ($row = mysqli_fetch_assoc($result)) {
-        $topUsers[] = $row;
-        if ($row['user_id'] == $safe_user_id) {
-            $userInTop10 = true;
-        }
-    }
-    mysqli_free_result($result);
-
-    if (empty($topUsers)) {
-        bot_message($chat_id, "אין עדיין נתונים לחודש האחרון.");
-        return;
-    }
-
-    // Display top 10
-    foreach ($topUsers as $idx => $user) {
-        $rank = $idx + 1;
-        $medal = '';
-        if ($rank == 1) $medal = '🥇';
-        elseif ($rank == 2) $medal = '🥈';
-        elseif ($rank == 3) $medal = '🥉';
-        else $medal = "{$rank}.";
-
-        $isYou = ($user['user_id'] == $safe_user_id) ? " ← YOU!" : "";
-        $message .= "{$medal} {$user['nickname']} - {$user['monthly_points']} Points{$isYou}\n";
-    }
-
-    // If user not in top 10, show their position
-    if (!$userInTop10) {
-        $query = "SELECT u.nickname, monthly.points as monthly_points, monthly.position
-                  FROM users u
-                  JOIN (
-                      SELECT user_id, SUM(points_change) as points,
-                      (SELECT COUNT(DISTINCT user_id) + 1 
-                       FROM point_log pl2
-                       WHERE pl2.timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-                       AND (SELECT SUM(points_change) FROM point_log WHERE user_id = pl2.user_id AND timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)) > 
-                           (SELECT SUM(points_change) FROM point_log WHERE user_id = pl.user_id AND timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY))
-                      ) as position
-                      FROM point_log pl
-                      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-                      AND user_id = $safe_user_id
-                      GROUP BY user_id
-                  ) monthly ON u.id = monthly.user_id
-                  WHERE u.id = $safe_user_id";
-        $result = mysqli_query($db, $query);
-
-        if ($result && mysqli_num_rows($result) > 0) {
-            $userRow = mysqli_fetch_assoc($result);
-            mysqli_free_result($result);
-
-            if ($userRow['nickname'] && $userRow['monthly_points'] > 0) {
-                $message .= "\n━━━━━━━━━━━━━━━\n\n";
-                $message .= "📍 {$userRow['position']}. {$userRow['nickname']} - {$userRow['monthly_points']} נקודות ← אתה!\n";
-            }
-        }
-    }
-
-    // Add back button
-    $keyboard = array(
-        array(
-            array('text' => '🔙 חזרה לתפריט', 'callback_data' => 'menu_back'),
-        ),
-    );
-    $markup = array('inline_keyboard' => $keyboard);
-    $message  .= ".";
-
-    bot_message($chat_id, $message, $markup);
+    $entries = fetchRollingEntries($db, 30);
+    $msg = renderLeaderboard($entries, $user_id, "📆 טבלת המובילים — חודשי\n(30 ימים אחרונים)");
+    $markup = ['inline_keyboard' => [[['text' => '🔙 חזרה לתפריט', 'callback_data' => 'menu_back']]]];
+    bot_message($chat_id, $msg, $markup);
 }
 
 

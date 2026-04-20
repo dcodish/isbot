@@ -44,13 +44,56 @@ Points awarded per answer based on question difficulty inferred from success rat
 Badges awarded for streaks, milestones, level-ups, time-of-day, consistency, and more. Tracked in `badges`, `user_badges`, and `badge_progress` tables. Call `BadgeService` methods after each answer in `variable_setup.php`.
 
 ### Leaderboards
-Three views — all-time, weekly, monthly — each renders as **top 10 + the current user's row appended if they're outside the top 10** (with `← אתה!` marker).
+Three views — all-time, weekly, monthly. All three share the same renderer
+(`renderLeaderboard()` in `bot_functions.php`); the three `show*` functions are
+thin wrappers that just fetch the eligible rows and pass a title.
 
-- **All-time:** reads `users.overall_points` directly. Filter: `nickname IS NOT NULL AND overall_points > 0`. Tie-break: `id ASC`.
-- **Weekly:** `SUM(point_log.points_change) WHERE timestamp >= NOW() - INTERVAL 7 DAY`.
+**Data sources (tie-break: `id ASC` throughout):**
+- **All-time:** reads `users.overall_points` directly. Filter: `nickname IS NOT NULL AND overall_points > 0`.
+- **Weekly:** `SUM(point_log.points_change) WHERE timestamp >= NOW() - INTERVAL 7 DAY`, `HAVING sum > 0`.
 - **Monthly:** same, with `INTERVAL 30 DAY`.
 
-**Rolling windows (by design).** Weekly/monthly boards use sliding 7/30-day intervals anchored to `NOW()`, not calendar-aligned periods (Sun–Sat, 1st–end-of-month). A student who earned points on Sunday will start dropping off the weekly board next Sunday. If this ever needs to become calendar-aligned for teacher-facing comms or reset rituals, it's a `WHERE` clause change in three functions: `showLeaderboardWeekly()` and `showLeaderboardMonthly()` in `bot_functions.php`, plus the "your position" subquery inside each.
+**Rolling windows (by design).** Weekly/monthly use sliding 7/30-day intervals
+anchored to `NOW()`, not calendar-aligned periods (Sun–Sat, 1st–end-of-month).
+A student who earned points on Sunday will start dropping off the weekly board
+next Sunday. If this ever needs to become calendar-aligned for teacher-facing
+comms or reset rituals, it's a `WHERE` clause change in `fetchRollingEntries()`.
+
+#### Display rules (motivational hybrid)
+
+The standard leaderboard shape "top 10 + user's position" demotivates everyone
+outside the top 10 (Landers 2017; Hamari & Koivisto; goal-gradient literature).
+We instead blend an aspirational podium with a local window so every user sees
+themselves surrounded by nearby peers.
+
+**Baseline:** podium (ranks 1–3) ∪ local window (`user_rank − 3` to
+`user_rank + 3`), clamped to `[1, total]`. If the union leaves a gap between
+the podium and the window, a separator line (`━━━`) is inserted.
+
+**Rank-by-rank behaviour** (with window = 3 above + 3 below):
+
+| Viewer's rank | Displayed ranks | Separator | Footer |
+|---|---|---|---|
+| 1 | 1..min(4, total) | none | 👑 "אתה בראש הטבלה" |
+| 2 or 3 | 1..min(user+3, total) | none | "נותרו X נקודות לעקוף את Y" |
+| 4..7 | 1..min(user+3, total) — contiguous with podium | none | next-goal delta |
+| 8+ | 1..3 + `━━━` + (user−3)..min(user+3, total) | yes | next-goal delta |
+| Last in non-empty board | same as above, but window clamps at `total` | as above | next-goal delta (to rank above) |
+| Not on the board (0 pts or no activity in window) | just the podium | implicit | "עדיין לא הופעת בטבלה — ענה על שאלות כדי להיכנס" |
+
+**Small-pool edge cases:**
+- **0 entries:** "אין עדיין משתתפים בטבלה."
+- **1–3 entries:** podium only; no window, no separator.
+- **4+ entries:** rules above. At 4–10 total the union naturally covers
+  everyone, so no separator appears.
+
+**Next-goal delta** (`נותרו X נקודות לעקוף את Y`): `X` is the gap to the
+user immediately above plus 1 (so the user knows exactly how many points
+breaks the tie and overtakes). Shown for every rank except 1 and "not on
+board".
+
+**"You" marker:** `← אתה!` suffix on the user's row. Medals 🥇🥈🥉 for ranks
+1–3; numeric `N.` prefix for ranks 4+.
 
 ### Nickname System
 New users are blocked from playing until a unique nickname is set (3–15 chars, `[a-zA-Z0-9_]`). The `awaiting_nickname` flag in `users` table gates all other commands in `checkNicknameRequired()`.
