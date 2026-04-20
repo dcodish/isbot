@@ -136,17 +136,22 @@ switch ($text) {
     } break;
 
     case '/level' : {
-        $query = "select level,current_run from users where id=" . $user_id;
+        $query = "select level,current_run from users where id=" . intval($user_id);
         $result = mysqli_query($db, $query);
         $fetch = mysqli_fetch_assoc($result);
-        $level = $fetch['level'];
-        $currentRun = $fetch['current_run'];
-        bot_message($chat_id,"השלב הנוכחי הוא : ".$level." והציון בתוך השלב הוא: ".$currentRun);
-
-        bot_message($chat_id,"שלב 1 - כל השאלות רנדומליות וקלות");
-        bot_message($chat_id,"שלב 2 - כל השאלות רנדומליות ורמת קושי בינונית");
-        bot_message($chat_id,"שלב 3 - שאלות חדשות רמת קושי בינונית");
-        bot_message($chat_id,"שלב 4 - שאלות חדשות רמת קושי גבוהה");
+        $level = intval($fetch['level']);
+        $currentRun = intval($fetch['current_run']);
+        $rlm = "\u{200F}";
+        $msg  = $rlm . "📊 הרמה שלך\n\n";
+        $msg .= $rlm . "🎯 רמה נוכחית: {$level}\n";
+        $msg .= $rlm . "📈 ציון בתוך השלב: {$currentRun}\n\n";
+        $msg .= $rlm . "━━━━━━━━━━━━━━\n";
+        $msg .= $rlm . "הסבר על הרמות:\n";
+        $msg .= $rlm . "1️⃣ כל השאלות רנדומליות וקלות\n";
+        $msg .= $rlm . "2️⃣ כל השאלות רנדומליות ורמת קושי בינונית\n";
+        $msg .= $rlm . "3️⃣ שאלות חדשות ברמת קושי בינונית\n";
+        $msg .= $rlm . "4️⃣ שאלות חדשות ברמת קושי גבוהה";
+        bot_message($chat_id, $msg);
         showNextQ();
     } break;
 
