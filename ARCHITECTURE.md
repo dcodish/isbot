@@ -43,6 +43,15 @@ Points awarded per answer based on question difficulty inferred from success rat
 ### Badge System (`BadgeService.php`)
 Badges awarded for streaks, milestones, level-ups, time-of-day, consistency, and more. Tracked in `badges`, `user_badges`, and `badge_progress` tables. Call `BadgeService` methods after each answer in `variable_setup.php`.
 
+### Leaderboards
+Three views — all-time, weekly, monthly — each renders as **top 10 + the current user's row appended if they're outside the top 10** (with `← אתה!` marker).
+
+- **All-time:** reads `users.overall_points` directly. Filter: `nickname IS NOT NULL AND overall_points > 0`. Tie-break: `id ASC`.
+- **Weekly:** `SUM(point_log.points_change) WHERE timestamp >= NOW() - INTERVAL 7 DAY`.
+- **Monthly:** same, with `INTERVAL 30 DAY`.
+
+**Rolling windows (by design).** Weekly/monthly boards use sliding 7/30-day intervals anchored to `NOW()`, not calendar-aligned periods (Sun–Sat, 1st–end-of-month). A student who earned points on Sunday will start dropping off the weekly board next Sunday. If this ever needs to become calendar-aligned for teacher-facing comms or reset rituals, it's a `WHERE` clause change in three functions: `showLeaderboardWeekly()` and `showLeaderboardMonthly()` in `bot_functions.php`, plus the "your position" subquery inside each.
+
 ### Nickname System
 New users are blocked from playing until a unique nickname is set (3–15 chars, `[a-zA-Z0-9_]`). The `awaiting_nickname` flag in `users` table gates all other commands in `checkNicknameRequired()`.
 

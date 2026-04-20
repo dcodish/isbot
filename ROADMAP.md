@@ -169,3 +169,4 @@ Not committed to, but worth revisiting:
 - **Notification reminders** — Telegram message to inactive users ("haven't practiced in 3 days")
 - **Exam mode** — timed session with fixed question count and no hints
 - **Question generation from lecture slides** — AI-assisted authoring for thin lectures
+- **Calendar-aligned leaderboards** — weekly/monthly boards currently use rolling 7/30-day windows (see [ARCHITECTURE.md § Leaderboards](ARCHITECTURE.md#leaderboards)). Could switch to calendar weeks (Sun–Sat) or calendar months to align with teacher-facing reset rituals. Simple `WHERE` clause change in `showLeaderboardWeekly/Monthly()`.
