@@ -410,16 +410,15 @@ function getQuestion() {
     $q_text = $fetch['question_text'];
 
 
-    $rtl_start = "\u{202B}";
-    $rtl_end = "\u{202C}";
-    $message = "1. " . $answers[$ansLocations[0] - 1];
-    $message_rtl = $rtl_start . $message . $rtl_end;
-    
-    $q1 = "1. ".$answers[$ansLocations[0]-1];
-    $q2 = "2. ".$answers[$ansLocations[1]-1];
-    $q3 = "3. ".$answers[$ansLocations[2]-1];
-    $q4 = "4. ".$answers[$ansLocations[3]-1];
-    $q = "$q_text \n$q1 \n$q2 \n$q3 \n$q4 \n .";
+    // Prepend RLM (U+200F) to force RTL base direction on every line, regardless of
+    // whether the line starts with Hebrew or Latin (e.g. "GPU", "NPU"). Without this,
+    // Telegram flips lines starting with Latin to LTR and the numbering/punctuation scrambles.
+    $rlm = "\u{200F}";
+    $q1 = $rlm . "1. " . $answers[$ansLocations[0]-1];
+    $q2 = $rlm . "2. " . $answers[$ansLocations[1]-1];
+    $q3 = $rlm . "3. " . $answers[$ansLocations[2]-1];
+    $q4 = $rlm . "4. " . $answers[$ansLocations[3]-1];
+    $q = $rlm . "$q_text \n$q1 \n$q2 \n$q3 \n$q4 \n .";
     bot_message($chat_id, $q );
     
     $ar = array();
