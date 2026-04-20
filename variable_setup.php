@@ -106,26 +106,27 @@ if (array_key_exists('callback_query', $update)) {
             $result = mysqli_query($db,$sql);
             $row= mysqli_fetch_assoc($result);
 
-            if ($row['numofanswers']==0) {
-                $stat = "אף אחד עדיין לא ניסה לפתור את השאלה הזו";
-                $percent = 0;
-            } else {
-                $percent = (100*$row['numofcorrectanswers']) / $row['numofanswers'];
-            }
+            $was_first_answer = ($row['numofanswers'] == 0);
+            $percent = $was_first_answer ? 0 : (100 * $row['numofcorrectanswers']) / $row['numofanswers'];
 
             if ($answer=="Correct") {
                 writeLog(1,$pieces[1]);
                 $ans = "תשובה נכונה";
                 $badgeCheck = recordAnswer($pieces[1], 1);
-                $stat = "אחוז התשובות הנכונות לשאלה זו הוא: ". round($percent,1)."%";
-                $stat = "$ans \n $stat";
-
+                if ($was_first_answer) {
+                    $stat = "$ans \n אתה הראשון לענות על השאלה הזו!";
+                } else {
+                    $stat = "$ans \n אחוז התשובות הנכונות לשאלה זו הוא: ". round($percent,1)."%";
+                }
             } else {
                 $ans = "טעות - התשובה הנכונה היא: ".$pieces[5];
                 writeLog(2,$pieces[1]);
                 $badgeCheck = recordAnswer($pieces[1], 2);
-                $stat = "אחוז התשובות הנכונות לשאלה זו (לא כולל הפדיחה שלך) היה: ". round($percent,1)."%";
-                $stat = "$ans \n $stat";
+                if ($was_first_answer) {
+                    $stat = "$ans \n אתה הראשון לענות על השאלה הזו";
+                } else {
+                    $stat = "$ans \n אחוז התשובות הנכונות לשאלה זו (לא כולל הפדיחה שלך) היה: ". round($percent,1)."%";
+                }
             }
 
             // Send answer feedback FIRST
