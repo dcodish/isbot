@@ -62,6 +62,11 @@ $db = mysqli_connect(
 
 mysqli_set_charset($db, 'utf8mb4');
 
+// Align MySQL session timezone with PHP so NOW(), DATE(), DATEDIFF() etc. agree with
+// PHP's date()/time() on Israel local time. Requires named timezones loaded on the
+// server (mysql_tzinfo_to_sql). Silently no-op if the named zone isn't available.
+@mysqli_query($db, "SET time_zone = 'Asia/Jerusalem'");
+
 $lastSQ = 0;
 
 if (!defined('TOKEN')) {
