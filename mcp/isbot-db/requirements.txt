@@ -2,4 +2,6 @@ mcp>=1.2.0
 python-dotenv>=1.0.0
 pymysql>=1.1.0
 sshtunnel>=0.4.0
-paramiko>=3.0.0
+# paramiko 4.0 dropped DSSKey, which sshtunnel 0.4 still imports.
+# Pin to the 3.x line until sshtunnel releases a compatible version.
+paramiko>=3.0.0,<4.0
