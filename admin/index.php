@@ -34,6 +34,25 @@ if ($wres && mysqli_num_rows($wres) > 0) {
     $current_week = intval($wrow['setting_value']);
     mysqli_free_result($wres);
 }
+
+// Parse lecture filter from GET
+$lecture_filter_raw = isset($_GET['lecture']) ? $_GET['lecture'] : 'all';
+$lecture_where = "";
+if ($lecture_filter_raw === 'null') {
+    $lecture_where = "WHERE max_lecture IS NULL";
+} elseif (is_numeric($lecture_filter_raw) && $lecture_filter_raw >= 1 && $lecture_filter_raw <= 12) {
+    $lecture_where = "WHERE max_lecture = " . intval($lecture_filter_raw);
+}
+
+// Build per-lecture counts for the dropdown
+$lecture_counts = array_fill(0, 13, 0); // index 0 = NULL, 1..12 = lectures
+$ccres = mysqli_query($conn, "SELECT COALESCE(max_lecture, 0) AS lec, COUNT(*) AS n FROM questions GROUP BY lec");
+if ($ccres) {
+    while ($crow = mysqli_fetch_assoc($ccres)) {
+        $lecture_counts[intval($crow['lec'])] = intval($crow['n']);
+    }
+    mysqli_free_result($ccres);
+}
 ?>
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
@@ -84,8 +103,25 @@ if ($wres && mysqli_num_rows($wres) > 0) {
 					<div class="col-sm-6">
 						<a href="#addQModal" class="btn btn-success" data-toggle="modal"><i class="material-icons">&#xE147;</i> <span>Add New Question</span></a>
 						<a href="JavaScript:void(0);" class="btn btn-danger" id="delete_multiple"><i class="material-icons">&#xE15C;</i> <span>Delete</span></a>
-						<a href="logout.php" class="btn btn-warning"><i class="material-icons">&#xE8AC;</i> <span>Logout</span></a>						
+						<a href="logout.php" class="btn btn-warning"><i class="material-icons">&#xE8AC;</i> <span>Logout</span></a>
 					</div>
+                </div>
+                <div class="row" style="margin-top: 10px;">
+                    <div class="col-sm-12">
+                        <form method="GET" class="form-inline">
+                            <label>Filter by lecture:</label>
+                            <select name="lecture" class="form-control" onchange="this.form.submit()">
+                                <option value="all" <?php echo $lecture_filter_raw === 'all' ? 'selected' : ''; ?>>All lectures</option>
+                                <?php for ($L = 1; $L <= 12; $L++): ?>
+                                    <option value="<?php echo $L; ?>" <?php echo ((string)$lecture_filter_raw === (string)$L) ? 'selected' : ''; ?>>
+                                        L<?php echo $L; ?> (<?php echo $lecture_counts[$L]; ?>)
+                                    </option>
+                                <?php endfor; ?>
+                                <option value="null" <?php echo $lecture_filter_raw === 'null' ? 'selected' : ''; ?>>Untagged (<?php echo $lecture_counts[0]; ?>)</option>
+                            </select>
+                            <noscript><button type="submit" class="btn btn-default">Apply</button></noscript>
+                        </form>
+                    </div>
                 </div>
             </div>
             <table class="table table-striped table-hover">
@@ -104,12 +140,13 @@ if ($wres && mysqli_num_rows($wres) > 0) {
 						<th  align="right">תשובה ג</th>
                         <th align="right">תשובה ד</th>
                         <th align="right">תשובה נכונה</th>
+                        <th align="right">שיעור</th>
                     </tr>
                 </thead>
 				<tbody>
 				    
 				<?php
-				$result = mysqli_query($conn,"SELECT * FROM questions order by reportedbad DESC");
+				$result = mysqli_query($conn,"SELECT * FROM questions $lecture_where ORDER BY reportedbad DESC");
 					$i=1;
 					while($row = mysqli_fetch_array($result)) {
 				?>
@@ -127,6 +164,7 @@ if ($wres && mysqli_num_rows($wres) > 0) {
 					<td><?php echo $row["option3"]; ?></td>
                     <td><?php echo $row["option4"]; ?></td>
                     <td><?php echo $row["correctans"]; ?></td>
+                    <td><?php echo $row["max_lecture"] !== null ? 'L' . $row["max_lecture"] : '—'; ?></td>
 					<td>
                         <a href="update-process.php?id=<?php echo $row["id"]; ?>">Update</a>
 						<a href="#deleteEmployeeModal" class="delete" data-id="<?php echo $row["id"]; ?>" data-toggle="modal"><i class="material-icons" data-toggle="tooltip" 
