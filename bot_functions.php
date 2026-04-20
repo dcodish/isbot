@@ -138,6 +138,37 @@ function photo($chat_id,$photo_link,$caption=null){
     bot("sendPhoto?chat_id=".$chat_id."&photo=".$photo_link."&caption=".$caption);
 }
 
+/**
+ * Send a photo uploaded from a local file (multipart POST).
+ * photo() above only handles Telegram-hosted URLs/file_ids.
+ */
+function sendPhotoFile($chat_id, $file_path, $caption = null, $markup = null) {
+    global $API_URL;
+
+    $post = [
+        'chat_id' => $chat_id,
+        'photo'   => new CURLFile($file_path),
+    ];
+    if ($caption !== null) $post['caption'] = $caption;
+    if ($markup !== null)  $post['reply_markup'] = json_encode($markup);
+
+    $ch = curl_init($API_URL . 'sendPhoto');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_TIMEOUT        => 15,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $post,
+        CURLOPT_SSL_VERIFYPEER => false,
+    ]);
+    $res = curl_exec($ch);
+    if ($res === false) {
+        error_log('sendPhotoFile failed: ' . curl_error($ch));
+        return null;
+    }
+    return json_decode($res, true);
+}
+
 function video($chat_id,$video_link,$caption=null){
     bot("sendVideo?chat_id=".$chat_id."&video=".$video_link."&caption=".$caption);
 }
@@ -715,97 +746,127 @@ function updateUserPoints($userId, $questionId, $actionType) {
 /**
  * Show user's badge collection
  */
+/**
+ * Composite all 20 badge images into a single 4x5 grid PNG. Earned badges render
+ * full-color; locked ones are desaturated and darkened. Returns the path of a
+ * temporary file the caller is expected to unlink after sending.
+ *
+ * Requires Imagick (available via Plesk PHP 8.2 on prod). The webp badge assets
+ * live in the repo's /badges/ folder, keyed by badges.badge_name.
+ */
+function buildBadgeClosetImage(array $earned_names, array $all_badges, int $cell = 180): ?string {
+    if (!extension_loaded('imagick')) {
+        error_log('buildBadgeClosetImage: Imagick not available');
+        return null;
+    }
+    $cols = 4;
+    $rows = (int)ceil(count($all_badges) / $cols);
+    $pad = 24;
+    $gap = 12;
+    $width  = $pad*2 + $cols*$cell + ($cols-1)*$gap;
+    $height = $pad*2 + $rows*$cell + ($rows-1)*$gap;
+
+    $canvas = new Imagick();
+    $canvas->newImage($width, $height, new ImagickPixel('#f5eedd'));
+    $canvas->setImageFormat('png');
+
+    $badges_dir = __DIR__ . '/badges';
+
+    $i = 0;
+    foreach ($all_badges as $badge) {
+        $col = $i % $cols;
+        $row = intdiv($i, $cols);
+        $x = $pad + $col * ($cell + $gap);
+        $y = $pad + $row * ($cell + $gap);
+
+        $asset = $badges_dir . '/' . $badge['badge_name'] . '.webp';
+        if (!is_file($asset)) { $i++; continue; }
+
+        try {
+            // [0] pins Imagick to the first frame for animated webp
+            $img = new Imagick($asset . '[0]');
+            $img->resizeImage($cell, $cell, Imagick::FILTER_LANCZOS, 1);
+
+            if (!in_array($badge['badge_name'], $earned_names, true)) {
+                // Locked: grayscale + darken so it reads as "not yet"
+                $img->modulateImage(55, 0, 100);
+            }
+
+            $canvas->compositeImage($img, Imagick::COMPOSITE_OVER, $x, $y);
+            $img->destroy();
+        } catch (Exception $e) {
+            error_log("badge render failed for {$badge['badge_name']}: " . $e->getMessage());
+        }
+        $i++;
+    }
+
+    $tmp = tempnam(sys_get_temp_dir(), 'closet_') . '.png';
+    $canvas->writeImage($tmp);
+    $canvas->destroy();
+    return $tmp;
+}
+
 function showBadgesRoom() {
     global $db, $user_id, $chat_id;
 
     $safe_user_id = intval($user_id);
 
-    // Get user's earned badges with sticker info
-    $query = "SELECT b.badge_id, b.badge_name, b.badge_title_he, b.badge_description_he, 
-                     b.badge_emoji, b.badge_type, b.sticker_file_id, ub.earned_at
-              FROM user_badges ub
-              JOIN badges b ON ub.badge_id = b.badge_id
-              WHERE ub.user_id = $safe_user_id AND b.is_active = 1
-              ORDER BY ub.earned_at DESC";
+    // Stable order for the grid layout so the user can track progress visually over time.
+    $all_badges = [];
+    $res = mysqli_query($db, "SELECT badge_id, badge_name, badge_title_he, badge_emoji
+                              FROM badges WHERE is_active = 1 ORDER BY badge_id");
+    if ($res) {
+        while ($row = mysqli_fetch_assoc($res)) $all_badges[] = $row;
+        mysqli_free_result($res);
+    }
 
-    $result = mysqli_query($db, $query);
-    $earned_badges = [];
-    $earned_count = 0;
-
-    if ($result) {
-        while ($row = mysqli_fetch_assoc($result)) {
-            $earned_badges[] = $row;
-            $earned_count++;
+    // Earned set (most recent first for the caption).
+    $earned = [];
+    $earned_names = [];
+    $res = mysqli_query($db, "SELECT b.badge_name, b.badge_title_he, b.badge_emoji, ub.earned_at
+                              FROM user_badges ub
+                              JOIN badges b ON ub.badge_id = b.badge_id
+                              WHERE ub.user_id = $safe_user_id AND b.is_active = 1
+                              ORDER BY ub.earned_at DESC");
+    if ($res) {
+        while ($row = mysqli_fetch_assoc($res)) {
+            $earned[] = $row;
+            $earned_names[] = $row['badge_name'];
         }
-        mysqli_free_result($result);
+        mysqli_free_result($res);
     }
 
-    // Get total active badges count
-    $query = "SELECT COUNT(*) as total FROM badges WHERE is_active = 1";
-    $result = mysqli_query($db, $query);
-    $total_badges = 0;
-    if ($result && mysqli_num_rows($result) > 0) {
-        $row = mysqli_fetch_assoc($result);
-        $total_badges = intval($row['total']);
-        mysqli_free_result($result);
-    }
+    $earned_count = count($earned);
+    $total = count($all_badges);
 
-    // Build message
-    $message = "🏅 אוסף התגים שלך\n\n";
-    $message .= "צברת {$earned_count} מתוך {$total_badges} תגים! 🎉\n\n";
-
+    $rlm = "\u{200F}";
+    $caption = $rlm . "🏆 ארון הגביעים שלך — {$earned_count}/{$total}\n";
     if ($earned_count > 0) {
-        $message .= "━━━━━━━━━━━━━━━━\n";
-        $message .= "✨ התגים שלך:\n\n";
-
-        foreach ($earned_badges as $badge) {
-            $emoji = $badge['badge_emoji'] ?: '🏆';
-            $date = date('d/m/Y', strtotime($badge['earned_at']));
-            $message .= "{$emoji} <b>{$badge['badge_title_he']}</b>\n";
-            $message .= "   {$badge['badge_description_he']}\n";
-            $message .= "   📅 התקבל: {$date}\n\n";
+        $caption .= "\n" . $rlm . "התגים שצברת:\n";
+        foreach ($earned as $b) {
+            $emoji = $b['badge_emoji'] ?: '🏆';
+            $date = date('d/m/Y', strtotime($b['earned_at']));
+            $caption .= $rlm . "{$emoji} {$b['badge_title_he']} — {$date}\n";
         }
     } else {
-        $message .= "עדיין לא צברת תגים. 😔\n";
-        $message .= "התחל לענות על שאלות כדי לזכות בתגים!\n\n";
+        $caption .= "\n" . $rlm . "עדיין לא צברת תגים. התחל לענות על שאלות!";
     }
+    // Telegram photo caption limit is 1024 chars; trim gracefully if we blow through it.
+    if (mb_strlen($caption) > 1020) $caption = mb_substr($caption, 0, 1019) . "…";
 
-    // Get some unearned badges as goals
-    $query = "SELECT b.badge_id, b.badge_name, b.badge_title_he, b.badge_description_he, 
-                     b.badge_emoji, b.points_reward
-              FROM badges b
-              WHERE b.is_active = 1 
-              AND b.badge_id NOT IN (
-                  SELECT badge_id FROM user_badges WHERE user_id = $safe_user_id
-              )
-              ORDER BY b.points_reward ASC
-              LIMIT 5";
+    $markup = ['inline_keyboard' => [[
+        ['text' => '🔙 חזרה לתפריט', 'callback_data' => 'menu_back'],
+    ]]];
 
-    $result = mysqli_query($db, $query);
-    $unearned_badges = [];
+    $image_path = buildBadgeClosetImage($earned_names, $all_badges);
 
-    if ($result) {
-        while ($row = mysqli_fetch_assoc($result)) {
-            $unearned_badges[] = $row;
-        }
-        mysqli_free_result($result);
+    if ($image_path && is_file($image_path)) {
+        sendPhotoFile($chat_id, $image_path, $caption, $markup);
+        @unlink($image_path);
+    } else {
+        // Fallback: text-only if Imagick isn't available or rendering failed.
+        bot_message($chat_id, $caption, $markup);
     }
-
-    // Add back button
-    $keyboard = array(
-        array(
-            array('text' => '🔙 חזרה לתפריט', 'callback_data' => 'menu_back'),
-        ),
-    );
-
-    $markup = array('inline_keyboard' => $keyboard);
-
-    // Send message with HTML formatting
-    $message = urlencode($message);
-    $markup_json = json_encode($markup);
-    $markup_encoded = urlencode($markup_json);
-
-    bot("sendMessage?chat_id={$chat_id}&text={$message}&parse_mode=HTML&reply_markup={$markup_encoded}");
 }
 
 /////////////////////////////////////////////////////////////////////////
