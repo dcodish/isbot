@@ -402,12 +402,13 @@ function getQuestion() {
     error_log("[DEBUG] Level: $level | Selected Question ID: " . $fetch['id'] . " | Difficulty: " . $fetch['difficulty']);
 
     $correct = $fetch['correctans'];
-    $answers = array($fetch['option1'],$fetch['option2'],$fetch['option3'],$fetch['option4']);
+    // Defensive: strip trailing whitespace. Legacy imports left \r\n on many rows.
+    $answers = array(rtrim($fetch['option1']), rtrim($fetch['option2']), rtrim($fetch['option3']), rtrim($fetch['option4']));
 
     $ansLocations = array(1, 2, 3, 4);
     shuffle($ansLocations);
     $newCorrectAns = array_search($correct, $ansLocations)+1;
-    $q_text = $fetch['question_text'];
+    $q_text = rtrim($fetch['question_text']);
 
 
     // Prepend RLM (U+200F) to force RTL base direction on every line, regardless of
