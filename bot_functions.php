@@ -839,20 +839,22 @@ function showBadgesRoom() {
     $earned_count = count($earned);
     $total = count($all_badges);
 
+    // Build the text block. Photo captions on Telegram don't always honor RTL
+    // paragraph alignment; plain text messages do. So we send the image with no
+    // caption, then the details as a separate text message — still within the
+    // "1-2 messages per badges view" budget.
     $rlm = "\u{200F}";
-    $caption = $rlm . "🏆 ארון הגביעים שלך — {$earned_count}/{$total}\n";
+    $text = $rlm . "🏆 ארון הגביעים שלך — {$earned_count}/{$total}\n";
     if ($earned_count > 0) {
-        $caption .= "\n" . $rlm . "התגים שצברת:\n";
+        $text .= "\n" . $rlm . "התגים שצברת:\n";
         foreach ($earned as $b) {
             $emoji = $b['badge_emoji'] ?: '🏆';
             $date = date('d/m/Y', strtotime($b['earned_at']));
-            $caption .= $rlm . "{$emoji} {$b['badge_title_he']} — {$date}\n";
+            $text .= $rlm . "{$emoji} {$b['badge_title_he']} — {$date}\n";
         }
     } else {
-        $caption .= "\n" . $rlm . "עדיין לא צברת תגים. התחל לענות על שאלות!";
+        $text .= "\n" . $rlm . "עדיין לא צברת תגים. התחל לענות על שאלות!";
     }
-    // Telegram photo caption limit is 1024 chars; trim gracefully if we blow through it.
-    if (mb_strlen($caption) > 1020) $caption = mb_substr($caption, 0, 1019) . "…";
 
     $markup = ['inline_keyboard' => [[
         ['text' => '🔙 חזרה לתפריט', 'callback_data' => 'menu_back'],
@@ -861,11 +863,12 @@ function showBadgesRoom() {
     $image_path = buildBadgeClosetImage($earned_names, $all_badges);
 
     if ($image_path && is_file($image_path)) {
-        sendPhotoFile($chat_id, $image_path, $caption, $markup);
+        sendPhotoFile($chat_id, $image_path);
         @unlink($image_path);
+        bot_message($chat_id, $text, $markup);
     } else {
         // Fallback: text-only if Imagick isn't available or rendering failed.
-        bot_message($chat_id, $caption, $markup);
+        bot_message($chat_id, $text, $markup);
     }
 }
 
