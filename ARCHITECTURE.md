@@ -37,11 +37,32 @@ Users progress through 4 levels. Question selection is **probability-based on su
 
 Progression controlled by `current_run` counter in `users` table vs. thresholds in `gamification` table. Correct answers increment, wrong answers decrement.
 
+**Probation pool for new questions.** Questions with `numofanswers < 5` are treated as "unrated" and are sampled by every level at fixed rates (L1 30% / L2 25% / L3 20% / L4 15%) before the normal success-rate buckets are consulted. Without this, a single wrong first answer would put the question at 0% success rate and strand it in L4 forever; a single right answer would lock it to L1. After 5 answers accumulate, the regular bands classify it naturally. See `getQuestion()` in `bot_functions.php`.
+
+**Lecture filter.** Every selection query is gated by `(max_lecture IS NULL OR max_lecture <= $current_week)` where `$current_week` comes from `settings.current_week`. NULL means "always visible". Students see only material covered in lectures 1..current_week.
+
 ### Points System
 Points awarded per answer based on question difficulty inferred from success rate. Rules stored in `point_rules` table (action_type × question_level → points). All transactions logged in `point_log`, including badge bonus rewards (stored with `question_id IS NULL`).
 
 ### Badge System (`BadgeService.php`)
 Badges awarded for streaks, milestones, level-ups, time-of-day, consistency, and more. Tracked in `badges`, `user_badges`, and `badge_progress` tables. Call `BadgeService` methods after each answer in `variable_setup.php`.
+
+**Trophy closet view.** `showBadgesRoom()` renders a single 4×5 composite image (`buildBadgeClosetImage()` in `bot_functions.php`) with earned badges in full color and locked ones grayscaled. Badge assets live in `/badges/*.webp` (one-time extracted from each badge's Telegram `sticker_file_id`). Compositing uses Imagick (Plesk PHP 8.2); animated webp badges render their first frame via the `[0]` suffix. Because Telegram photo captions don't reliably honor RTL paragraph alignment, the image is sent with no caption and a separate text message with the earned list follows — two messages total.
+
+### Settings & Tunable Parameters
+The `settings` table (`setting_key VARCHAR(64) PRIMARY KEY, setting_value VARCHAR(255), updated_at TIMESTAMP`) is the central key/value store for runtime-tunable behaviour. Current keys:
+- `current_week` (1–12) — the lecture filter gate; students see questions with `max_lecture ≤ current_week`
+- `session_gap_minutes` (integer) — inactivity threshold before a new session begins and previous-session questions are wiped (default 30)
+
+Readers: `getCurrentWeek()` / `getSessionGapMinutes()` in `bot_functions.php`, each caches the value statically within one request. Writers: `admin/index.php` exposes a form for `current_week`; other keys are still SQL-only until the unified settings admin page ships (roadmap #3a).
+
+### Session Management & Content-Theft Mitigation
+Every question message sent to a user (stem + "what's the correct answer?" prompt) is logged to `session_question_messages` with its `message_id`. On every interaction, `maybeStartNewSession()` in `bot_functions.php` checks `users.last_interaction_at` against `settings.session_gap_minutes`. If the gap is exceeded, uncleaned rows for that user are cleaned via `deleteMessage` (for messages ≤ 48h old) or `editMessageText` to "שאלה זו הוסרה" as fallback. The current interaction then proceeds; `last_interaction_at` is updated to `NOW()`.
+
+Only question messages are tracked — feedback, stats, leaderboards, badges, and menus stay visible across sessions for review value.
+
+### Question Authoring (`question-writer` subagent)
+A project-level Claude Code subagent at `.claude/agents/question-writer.md` drafts new Hebrew questions against `runtime/lecture_topic_map.md` and the lecture transcripts in `…/מבוא למערכות מידע/הרצאות/2026/2026-2/complete lessons/תמלולים/`. Approved drafts are inserted into the DB via `tools/insert_questions.php` (prepared statements). Default batch size is 10 questions; integrative questions are tagged with the highest lecture number involved so they respect the `max_lecture <= current_week` filter correctly.
 
 ### Leaderboards
 Three views — all-time, weekly, monthly. All three share the same renderer
@@ -105,8 +126,8 @@ Session-authenticated web UI for question CRUD. Credentials from `.env`. Questio
 
 | Table | Purpose |
 |---|---|
-| `users` | User state: level, current_run, overall_points, nickname, awaiting_nickname |
-| `questions` | Question bank with success tracking (numofanswers, numofcorrectanswers, reportedbad) |
+| `users` | User state: level, current_run, overall_points, nickname, awaiting_nickname, last_interaction_at |
+| `questions` | Question bank with success tracking (numofanswers, numofcorrectanswers, reportedbad, max_lecture) |
 | `user_q` | Per-user question history (numofsuccess, numoffailure) |
 | `gamification` | Level up/down thresholds per level (columns: level, upgrade_at, downgrade_at) |
 | `point_rules` | Points awarded per (action_type, question_level) |
@@ -114,6 +135,8 @@ Session-authenticated web UI for question CRUD. Credentials from `.env`. Questio
 | `badges` / `user_badges` / `badge_progress` | Badge definitions, earned badges, progress |
 | `survey_questions` / `user_survey` | Optional research survey interleaved with quiz |
 | `processed_updates` | Deduplication of Telegram update_ids |
+| `session_question_messages` | Per-user log of sent question message_ids for session-boundary cleanup |
+| `settings` | Key/value store for tunable parameters (`current_week`, `session_gap_minutes`, …) |
 | `actions` | Action-type lookup (CorrectAnswer, WrongAnswer, Skip, etc.) |
 | `log` | General action audit log |
 
@@ -131,8 +154,11 @@ Handled in `variable_setup.php`. Key formats:
 Located under `tools/` — see [tools/README.md](tools/README.md).
 
 - `tools/import.php` — Import questions from `new file.txt` (6-line format: question, A, B, C, D, answer)
+- `tools/insert_questions.php` — Prepared-statement batch insert from a JSON file; used by the question-writer subagent
 - `tools/export.php` — HTML table view of question bank
 - `tools/exportforexam*.php` — Institution-specific filtered exports (BGU, Sami)
+
+One-off DB changes live in `migrations/YYYY-MM-DD_description.sql`. Apply via `scp` + `mysql < file` on prod. All migrations are idempotent (`IF NOT EXISTS`, `ON DUPLICATE KEY UPDATE`) so re-running is safe.
 
 ## Known Issues / Tech Debt
 
