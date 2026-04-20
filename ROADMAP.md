@@ -121,6 +121,28 @@ Show a student how many questions they've answered from the current week's lectu
 ### 6. Question Coverage Report in Admin Panel
 Summary table: `Lecture | # Questions | # Answered | Avg Success Rate`. Spots thin lectures at a glance.
 
+### 6a. Topic-Level Coverage Report (management view)
+Deeper drill-down per lecture: break each lecture into its key topics (from the presentation) and show how many questions cover each topic, at which complexity level. Answers "where am I over-covered? where are there blind spots? is my complexity mix balanced across topics?"
+
+Shape:
+```
+Lecture 3 — Hardware & CPU
+  Topic                              Basic  Applied  Analytical  Integrative  Total
+  ─────────────────────────────────────────────────────────────────────────────────
+  Transistors / Moore's Law            2       1         0            0         3
+  Bit/Byte/Encoding                    3       2         1            0         6
+  CPU architecture (ALU/registers)     2       1         1            1         5
+  Memory hierarchy                     1       0         0            0         1   ⚠ thin
+  GPU / NPU                            0       2         0            0         2
+  ...
+```
+
+Dependencies (not trivial):
+- New columns: `questions.topic` (string, free-form or FK to a topics table) and `questions.complexity` (enum: basic / applied / analytical / integrative). The question-writer agent already drafts with these labels — they just aren't persisted yet.
+- Canonical topic list per lecture — `runtime/lecture_topic_map.md` is a starting point but needs a normalised form (e.g. `lecture_topics(id, lecture, topic_he)`).
+- Backfill for the existing 531 questions — either bulk-classify via an LLM pass or progressively as questions get edited. For Lectures 1–3 (the ones we're exposing now) manual/assisted classification is feasible.
+- Admin UI: lecture selector → topic × complexity matrix; highlight empty cells and cells below a threshold.
+
 ### 7. Bot Abuse Prevention
 Concern: students running scripts against the bot to farm points / game leaderboards. Mitigations to evaluate:
 - Rate limiting per `user_id` (max N answers per minute)
