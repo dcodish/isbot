@@ -7,156 +7,133 @@ This document tracks what the bot currently does and what we plan to build next.
 ## Current Features
 
 ### Core Quiz Loop
-- Users receive multiple-choice questions via Telegram inline keyboard
-- Question selection is **probability-based on success rate**, not fixed difficulty
-- Correct answers advance a `current_run` counter; wrong answers decrement it
+- Multiple-choice questions via Telegram inline keyboard
+- Question selection **probability-based on success rate**, not fixed difficulty
+- New questions (< 5 answers) routed through a "probation" pool that every level samples, so they accumulate data before classification
+- Correct answers advance `current_run`; wrong answers decrement it
 - Questions already answered correctly (at higher levels) are excluded from future draws
+- RTL-safe rendering for mixed Hebrew/Latin option text
+- "First answer" message instead of misleading "0% correct" for previously unanswered questions
 
 ### Levels
-- 4 levels with configurable upgrade/downgrade thresholds (stored in `gamification` table)
-- Level 1: easy questions (≥80% success rate)
-- Level 2: medium mix
+- 4 levels with configurable upgrade/downgrade thresholds (`gamification` table)
+- Level 1: easy (≥80% success rate)
+- Level 2: 70–80% / 80%+ mix
 - Level 3/4: progressively harder, no repeated questions
 
 ### Points System
-- Points awarded per answer based on question difficulty (derived from success rate)
-- Rules stored in `point_rules` table (action type × question level)
-- Full transaction log in `point_log` including badge bonus rewards
+- Points per answer based on inferred question difficulty
+- Rules in `point_rules` (action_type × question_level)
+- Full audit log in `point_log` including badge bonuses
 
 ### Badge System
-- 30+ badge types: streaks, milestones, level-ups, time-of-day, consistency
-- Progress tracking across sessions (`badge_progress` table)
-- Badge room view (`/badges`) shows earned and locked badges
+- 20 active badges: streaks, milestones, level-ups, time-of-day, consistency
+- Progress tracking in `badge_progress`
+- **Trophy closet view** (`/menu` → 🏅): 4×5 composite image with earned badges in color, locked in grayscale; text caption lists titles + dates
 
-### Leaderboards
-- All-time leaderboard (`/leaderboard`)
-- Weekly leaderboard (`/leaderboard_weekly`)
-- Monthly leaderboard (`/leaderboard_monthly`)
+### Leaderboards (hybrid motivational design)
+- Three views: all-time, weekly (rolling 7 days), monthly (rolling 30 days)
+- **Display rule:** podium (ranks 1–3) ∪ local window (3 above + 3 below the viewer), with separator line when podium and window aren't contiguous
+- **Next-goal delta:** "X points to overtake {user above}" for everyone except rank 1 and not-on-board
+- 👑 message for rank 1; onboarding nudge for users not yet on the board
+- See [ARCHITECTURE.md § Leaderboards](ARCHITECTURE.md#leaderboards) for full rule table
+
+### Lecture-Based Question Filtering
+- `questions.max_lecture` populated for all 531 questions across 12 lectures
+- `settings.current_week` setting gates which lectures students see (via `max_lecture ≤ current_week`)
+- Injected into all 20 question-selection queries in `getQuestion()`
+- Admin panel: `current_week` form + per-lecture column + filter dropdown
 
 ### User Onboarding & Nickname
-- New users blocked until a unique nickname is set (3–15 chars, alphanumeric + underscore)
+- New users blocked until unique nickname set (3–15 chars, `[a-zA-Z0-9_]`)
 - Nickname change supported after initial setup
 
 ### Main Menu
-- Inline menu for navigation (question, leaderboard, stats, badges, level info)
+- 3-item inline menu: Play / Badges / Leaderboards (sub-menu)
 
-### User Stats
-- `/stat` shows personal stats: points, level, correct/wrong counts
-- `/level` shows current level and progress toward next
+### User Stats & Commands
+- `/stat` — points, level, correct/wrong counts
+- `/level` — current level + progress to next
+- Slash-command shortcuts for leaderboards (`/leaderboard`, `/leaderboard_weekly`, `/leaderboard_monthly`) kept as hidden power-user aliases
 
 ### Question Reporting
-- Users can flag unclear questions (`Bad:ID` callback)
-- Reported questions surface at the top of the admin panel list
+- Users flag unclear questions (`Bad:ID` callback); reported questions surface at top of admin list
 
 ### Survey System
-- Optional research survey questions interleaved with quiz questions
-- Tracked separately in `survey_questions` / `user_survey` tables
+- Optional research survey questions interleaved with quiz
+- Tracked in `survey_questions` / `user_survey`
 
 ### Admin Panel (`/admin/`)
-- Session-authenticated web UI (credentials via `.env`)
-- Question CRUD: add, edit, delete
-- Reported questions highlighted for review
+- Session-authenticated web UI
+- Question CRUD, lecture column, per-lecture filter
+- `current_week` setting form
+- Reported questions highlighted
 
-### Import / Export Tools (`tools/`)
-- `import.php` — bulk import from a plain-text file (6-line format per question)
-- `importnew.php` — variant import flow
-- `export.php` — HTML table export of the question bank
-- Institution-specific exports for BGU and Sami exam formats
+### Import / Content Tools (`tools/`)
+- `import.php` / `importnew.php` — legacy 6-line text-file imports
+- `insert_questions.php` — JSON-to-DB via prepared statements (used by the question-writer agent)
+- `export.php` and institution-specific exports (BGU, Sami)
+
+### Authoring — question-writer subagent
+- Project-level Claude Code agent (`.claude/agents/question-writer.md`)
+- Drafts Hebrew questions against the lecture topic map + transcripts, iterates with the user, writes approved questions straight to the DB
 
 ### Infrastructure
 - Hybrid runtime: webhook on prod, polling for local dev
-- Deduplication via `processed_updates` table (replay-safe)
+- Deduplication via `processed_updates` table
 - Debug logging under `runtime/` (local only)
-
-### Lecture Tagging (data only — not yet exposed)
-- `questions.max_lecture` column populated for all 531 questions across 12 lectures
-- Distribution: L1:32, L2:40, L3:23, L4:46, L5:23, L6:20, L7:77, L8:1, L9:116, L10:60, L11:72, L12:21
-- Reference: [`runtime/lecture_topic_map.md`](runtime/lecture_topic_map.md), [`runtime/tagging_final.sql`](runtime/tagging_final.sql)
-
----
-
-## Active Work
-
-### 1. Expose Lectures 1–3 to Students
-> *Let students practice only on material covered in lectures 1–3 (what's been taught so far).*
-
-**Phase A — Mapping review (in progress)**
-- Review all L1, L2, L3 tagged questions for correctness
-- Reassign any miscategorized questions
-
-**Phase B — Question coverage**
-- Confirm counts per lecture (currently L1:32, L2:40, L3:23) are sufficient for practice
-- Author additional questions where thin
-
-**Phase C — Student-facing filter (code)**
-- `settings` table with `current_week` key (default: 3)
-- Inject `WHERE max_lecture <= current_week` into `getQuestion()` selection queries
-- Admin UI: read/write `current_week`
-- No user-visible UI yet — just the gate
+- **Timezone:** PHP and MySQL session both set to Asia/Jerusalem so badges/streaks/leaderboards agree on clock
 
 ---
 
 ## Planned
 
-### 2. Telegram Admin Command: `/setweek N`
-Let the professor update `settings.current_week` from Telegram without opening the admin panel. Checks admin status in `variable_setup.php`.
-Depends on: #1 Phase C.
+Ordered roughly by priority / dependency. Items that were blocked on lecture filtering are now unblocked.
 
-### 3. Bot Abuse Prevention
-> *Concern: students may run their own bots/scripts against the Telegram bot to farm points or game leaderboards.*
+### 1. Telegram Admin Command: `/setweek N`
+Let the professor update `settings.current_week` from Telegram without opening the admin panel. Check admin user in `variable_setup.php`; validate 1–12.
 
-Possible mitigations to evaluate:
+### 2. Week Auto-Advance
+Store `semester_start_date` in `settings`. Bot computes `current_week = FLOOR(DATEDIFF(NOW(), start_date) / 7) + 1`. Hands-off operation once the semester starts.
+
+### 3. max_lecture in Admin Add/Edit Forms
+The admin panel shows a `שיעור` column and lets you filter by it, but the Add/Edit modals don't include a field for it. Authors have to use the question-writer agent or SQL to set/change `max_lecture`. Fill in the modal fields.
+
+### 4. Per-Lecture Leaderboard
+Rank students by points earned on questions within a specific lecture. Good for per-class engagement and highlighting recent-material mastery.
+
+### 5. Lecture Progress Indicator
+Show a student how many questions they've answered from the current week's lecture. e.g. "ענית על 4 מתוך 12 שאלות מהשיעור השבועי."
+
+### 6. Question Coverage Report in Admin Panel
+Summary table: `Lecture | # Questions | # Answered | Avg Success Rate`. Spots thin lectures at a glance.
+
+### 7. Bot Abuse Prevention
+Concern: students running scripts against the bot to farm points / game leaderboards. Mitigations to evaluate:
 - Rate limiting per `user_id` (max N answers per minute)
-- Human-interaction signals (minimum think-time between question sent → answer)
+- Minimum think-time between question sent → answer
 - Anomaly detection on suspiciously fast/perfect runs
 - Captcha / survey checkpoints at milestones
-No solution committed yet — needs investigation of what's actually feasible on Telegram's side.
 
-### 4. Timezone Fix for Time-Based Badges
-> *Server time differs from Israel time, so badges like "early bird" / "night owl" / daily-streak fire on the wrong clock.*
-
-Audit all badge logic that reads server time (`time()`, `NOW()`, `DATE()`) and convert to Asia/Jerusalem. Options:
-- Set MySQL session timezone at connection (`SET time_zone = 'Asia/Jerusalem'`)
-- Set PHP default (`date_default_timezone_set`)
-- Explicit conversion at each read site
-Pick one approach and apply consistently.
-
-### 5. Visual Personal Dashboard
-> *A rich, visual stats page per user — not just text.*
-
-Ideas to explore:
+### 8. Visual Personal Dashboard
+A rich visual stats page per user:
 - Progress bars per lecture
 - Weekly activity heatmap
 - Points trend chart
-- Badges earned / locked grid
-- Delivery: Telegram image render (server-side chart → PNG) vs. web link (mini web view)
-Needs design pass before implementation.
+- Badges-earned grid (could reuse trophy closet)
+- Delivery: Telegram image render (server-side chart → PNG) vs. web link (mini web view). Needs design pass first.
 
-### 6. Week Auto-Advance
-Store `semester_start_date`; compute `current_week = FLOOR(DATEDIFF(NOW(), start_date) / 7) + 1`. Hands-off operation once started.
-Depends on: #1 Phase C.
-
-### 7. Per-Lecture Leaderboard
-Rank students by points earned on questions from a specific lecture. Good for per-class engagement.
-Depends on: #1 Phase C.
-
-### 8. Lecture Progress Indicator
-Tell a student how many questions they've answered from the current week's lecture. e.g. "ענית על 4 מתוך 12 שאלות מהשיעור השבועי."
-Depends on: #1 Phase C.
-
-### 9. Question Coverage Report in Admin Panel
-Summary table: `Lecture | # Questions | # Answered | Avg Success Rate`. Spots thin lectures.
-Depends on: #1 Phase C.
-
-### 10. Student Unlock Code
+### 9. Student Unlock Code
 Professor shares a weekly code in class; students enter it to unlock that week's questions. Alternative to auto-advance. Adds `users.student_week` + code in `settings`.
-Depends on: #1 Phase C.
 
-### 11. CSRF Protection in Admin Panel
+### 10. CSRF Protection in Admin Panel
 Add CSRF token to session, validate on every POST to `admin/backend/save.php`.
 
-### 12. SQL Injection Hardening
+### 11. SQL Injection Hardening
 Migrate raw query interpolation in `bot_functions.php` to prepared statements. Tracked in [ARCHITECTURE.md § Known Issues](ARCHITECTURE.md#known-issues--tech-debt).
+
+### 12. Historical DATETIME Backfill (minor)
+After the timezone switch to Asia/Jerusalem, rows previously written with UTC `NOW()` into DATETIME columns display as 3 hours "earlier" than they actually occurred. Low urgency since it only affects historic audit-log reads. If and when it matters, run a one-shot `UPDATE ... = DATE_ADD(col, INTERVAL 3 HOUR)` per affected column (and handle the DST 2-hour period separately).
 
 ---
 
@@ -166,7 +143,9 @@ Not committed to, but worth revisiting:
 
 - **Streak freeze / lifeline** — let students "bank" a streak-save token
 - **Group/team challenges** — class-wide challenge mode with shared progress
-- **Notification reminders** — Telegram message to inactive users ("haven't practiced in 3 days")
+- **Notification reminders** — Telegram DM to inactive users ("haven't practiced in 3 days")
 - **Exam mode** — timed session with fixed question count and no hints
-- **Question generation from lecture slides** — AI-assisted authoring for thin lectures
-- **Calendar-aligned leaderboards** — weekly/monthly boards currently use rolling 7/30-day windows (see [ARCHITECTURE.md § Leaderboards](ARCHITECTURE.md#leaderboards)). Could switch to calendar weeks (Sun–Sat) or calendar months to align with teacher-facing reset rituals. Simple `WHERE` clause change in `showLeaderboardWeekly/Monthly()`.
+- **Question generation from lecture slides** — AI-assisted authoring for thin lectures (the question-writer agent already does this interactively; automate as a batch?)
+- **Calendar-aligned leaderboards** — switch from rolling 7/30-day windows to calendar weeks/months. `WHERE`-clause change in `fetchRollingEntries()`. See [ARCHITECTURE.md § Leaderboards](ARCHITECTURE.md#leaderboards).
+- **Leagues** (cohorts of ~20 users) — if user base grows past ~50, global leaderboards become noise. Cohort-based leagues à la Duolingo would keep competition proximal.
+- **First-time question reveal** — if someone answers a probation question, surface "אתה הראשון" style framing more prominently (we hint at it now in the stat message, but could be celebrated).
