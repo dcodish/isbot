@@ -173,6 +173,28 @@ function writeLog ($op, $additional=0) {
 
 
 /**
+ * Reads settings.current_week (defaults to 12 = no restriction if the row is missing).
+ * Cached per request via static to avoid repeated lookups within one getQuestion() call.
+ */
+function getCurrentWeek() {
+    global $db;
+    static $cached = null;
+    if ($cached !== null) return $cached;
+
+    $result = mysqli_query($db, "SELECT setting_value FROM settings WHERE setting_key = 'current_week' LIMIT 1");
+    if ($result && mysqli_num_rows($result) > 0) {
+        $row = mysqli_fetch_assoc($result);
+        mysqli_free_result($result);
+        $week = intval($row['setting_value']);
+        $cached = ($week >= 1 && $week <= 12) ? $week : 12;
+    } else {
+        if ($result) mysqli_free_result($result);
+        $cached = 12;
+    }
+    return $cached;
+}
+
+/**
  * Helper function: Build SQL condition for success rate threshold for a given difficulty.
  * Returns SQL WHERE clause fragment to check success_rate for the specified difficulty and threshold.
  * Handles division-by-zero by checking numofanswers > 0.
@@ -220,6 +242,10 @@ function getQuestion() {
     // Sanitize user_id to prevent SQL injection
     $safe_user_id = intval($user_id);
 
+    // Restrict question pool to material taught so far. NULL max_lecture means "always visible".
+    $current_week = getCurrentWeek();
+    $lectureFilter = "(max_lecture IS NULL OR max_lecture <= $current_week)";
+
     // Get user level
     $query = "SELECT level FROM users WHERE id = $safe_user_id";
     $result = mysqli_query($db, $query);
@@ -234,7 +260,7 @@ function getQuestion() {
     switch ($level) {
         case 1: {
             // Level 1: success_rate >= 0.80, CAN repeat
-            $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.80 ORDER BY RAND() LIMIT 1";
+            $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.80 AND $lectureFilter ORDER BY RAND() LIMIT 1";
             $question_result = executeQuestionQuery($db, $query, "L1-main");
         } break;
 
@@ -244,11 +270,11 @@ function getQuestion() {
 
             if ($rand <= 70) {
                 // 70%: success_rate 70-80% (EXCLUSIVE range for Level 2)
-                $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.7 AND (numofcorrectanswers / numofanswers) < 0.8 ORDER BY RAND() LIMIT 1";
+                $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.7 AND (numofcorrectanswers / numofanswers) < 0.8 AND $lectureFilter ORDER BY RAND() LIMIT 1";
                 $question_result = executeQuestionQuery($db, $query, "L2-70-80-exclusive");
             } else {
                 // 30%: success_rate >= 0.80 (Level 1 range)
-                $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.8 ORDER BY RAND() LIMIT 1";
+                $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.8 AND $lectureFilter ORDER BY RAND() LIMIT 1";
                 $question_result = executeQuestionQuery($db, $query, "L2-80+");
             }
 
@@ -256,11 +282,11 @@ function getQuestion() {
             if ($question_result === null) {
                 if ($rand <= 70) {
                     // Tried 70-80%, now try ≥80%
-                    $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.8 ORDER BY RAND() LIMIT 1";
+                    $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.8 AND $lectureFilter ORDER BY RAND() LIMIT 1";
                     $question_result = executeQuestionQuery($db, $query, "L2-fallback-80+");
                 } else {
                     // Tried ≥80%, now try 70-80%
-                    $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.7 AND (numofcorrectanswers / numofanswers) < 0.8 ORDER BY RAND() LIMIT 1";
+                    $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.7 AND (numofcorrectanswers / numofanswers) < 0.8 AND $lectureFilter ORDER BY RAND() LIMIT 1";
                     $question_result = executeQuestionQuery($db, $query, "L2-fallback-70-80");
                 }
             }
@@ -273,11 +299,11 @@ function getQuestion() {
 
             if ($rand <= 50) {
                 // 50%: success_rate 60-70% (EXCLUSIVE range for Level 3)
-                $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.6 AND (numofcorrectanswers / numofanswers) < 0.7 AND $exclusion ORDER BY RAND() LIMIT 1";
+                $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.6 AND (numofcorrectanswers / numofanswers) < 0.7 AND $exclusion AND $lectureFilter ORDER BY RAND() LIMIT 1";
                 $question_result = executeQuestionQuery($db, $query, "L3-60-70-exclusive");
             } else {
                 // 50%: ≥70% (Level 1 or Level 2 ranges)
-                $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.7 AND $exclusion ORDER BY RAND() LIMIT 1";
+                $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.7 AND $exclusion AND $lectureFilter ORDER BY RAND() LIMIT 1";
                 $question_result = executeQuestionQuery($db, $query, "L3-70+-review");
             }
 
@@ -285,11 +311,11 @@ function getQuestion() {
             if ($question_result === null) {
                 if ($rand <= 50) {
                     // Tried 60-70%, now try ≥70%
-                    $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.7 AND $exclusion ORDER BY RAND() LIMIT 1";
+                    $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.7 AND $exclusion AND $lectureFilter ORDER BY RAND() LIMIT 1";
                     $question_result = executeQuestionQuery($db, $query, "L3-fallback-70+");
                 } else {
                     // Tried ≥70%, now try 60-70%
-                    $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.6 AND (numofcorrectanswers / numofanswers) < 0.7 AND $exclusion ORDER BY RAND() LIMIT 1";
+                    $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.6 AND (numofcorrectanswers / numofanswers) < 0.7 AND $exclusion AND $lectureFilter ORDER BY RAND() LIMIT 1";
                     $question_result = executeQuestionQuery($db, $query, "L3-fallback-60-70");
                 }
             }
@@ -302,15 +328,15 @@ function getQuestion() {
 
             if ($rand <= 50) {
                 // 50%: success_rate < 60% (EXCLUSIVE range for Level 4 - HARDEST)
-                $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) < 0.6 AND $exclusion ORDER BY RAND() LIMIT 1";
+                $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) < 0.6 AND $exclusion AND $lectureFilter ORDER BY RAND() LIMIT 1";
                 $question_result = executeQuestionQuery($db, $query, "L4-<60-hardest");
             } elseif ($rand <= 70) {
                 // 20%: success_rate 60-70% (Level 3 range)
-                $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.6 AND (numofcorrectanswers / numofanswers) < 0.7 AND $exclusion ORDER BY RAND() LIMIT 1";
+                $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.6 AND (numofcorrectanswers / numofanswers) < 0.7 AND $exclusion AND $lectureFilter ORDER BY RAND() LIMIT 1";
                 $question_result = executeQuestionQuery($db, $query, "L4-60-70");
             } else {
                 // 30%: success_rate ≥70% (Level 1 or Level 2 ranges)
-                $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.7 AND $exclusion ORDER BY RAND() LIMIT 1";
+                $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.7 AND $exclusion AND $lectureFilter ORDER BY RAND() LIMIT 1";
                 $question_result = executeQuestionQuery($db, $query, "L4-70+-review");
             }
 
@@ -321,16 +347,16 @@ function getQuestion() {
 
                 if ($rand <= 50) {
                     // Tried <60%, try 60-70% then ≥70%
-                    $fallback_queries[] = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.6 AND (numofcorrectanswers / numofanswers) < 0.7 AND $exclusion ORDER BY RAND() LIMIT 1";
-                    $fallback_queries[] = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.7 AND $exclusion ORDER BY RAND() LIMIT 1";
+                    $fallback_queries[] = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.6 AND (numofcorrectanswers / numofanswers) < 0.7 AND $exclusion AND $lectureFilter ORDER BY RAND() LIMIT 1";
+                    $fallback_queries[] = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.7 AND $exclusion AND $lectureFilter ORDER BY RAND() LIMIT 1";
                 } elseif ($rand <= 70) {
                     // Tried 60-70%, try <60% then ≥70%
-                    $fallback_queries[] = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) < 0.6 AND $exclusion ORDER BY RAND() LIMIT 1";
-                    $fallback_queries[] = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.7 AND $exclusion ORDER BY RAND() LIMIT 1";
+                    $fallback_queries[] = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) < 0.6 AND $exclusion AND $lectureFilter ORDER BY RAND() LIMIT 1";
+                    $fallback_queries[] = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.7 AND $exclusion AND $lectureFilter ORDER BY RAND() LIMIT 1";
                 } else {
                     // Tried ≥70%, try <60% then 60-70%
-                    $fallback_queries[] = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) < 0.6 AND $exclusion ORDER BY RAND() LIMIT 1";
-                    $fallback_queries[] = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.6 AND (numofcorrectanswers / numofanswers) < 0.7 AND $exclusion ORDER BY RAND() LIMIT 1";
+                    $fallback_queries[] = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) < 0.6 AND $exclusion AND $lectureFilter ORDER BY RAND() LIMIT 1";
+                    $fallback_queries[] = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.6 AND (numofcorrectanswers / numofanswers) < 0.7 AND $exclusion AND $lectureFilter ORDER BY RAND() LIMIT 1";
                 }
 
                 // Try each fallback query
@@ -345,14 +371,14 @@ function getQuestion() {
 
         default: {
             // Default fallback: any question
-            $query = "SELECT * FROM questions ORDER BY RAND() LIMIT 1";
+            $query = "SELECT * FROM questions WHERE 1=1 AND $lectureFilter ORDER BY RAND() LIMIT 1";
             $question_result = executeQuestionQuery($db, $query, "default");
         } break;
     }
 
     // Final fallback: if still no question, pick ANY question from the database
     if ($question_result === null) {
-        $query = "SELECT * FROM questions ORDER BY RAND() LIMIT 1";
+        $query = "SELECT * FROM questions WHERE 1=1 AND $lectureFilter ORDER BY RAND() LIMIT 1";
         $question_result = mysqli_query($db, $query);
     }
 

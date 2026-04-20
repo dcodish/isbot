@@ -68,93 +68,95 @@ This document tracks what the bot currently does and what we plan to build next.
 - Deduplication via `processed_updates` table (replay-safe)
 - Debug logging under `runtime/` (local only)
 
+### Lecture Tagging (data only — not yet exposed)
+- `questions.max_lecture` column populated for all 531 questions across 12 lectures
+- Distribution: L1:32, L2:40, L3:23, L4:46, L5:23, L6:20, L7:77, L8:1, L9:116, L10:60, L11:72, L12:21
+- Reference: [`runtime/lecture_topic_map.md`](runtime/lecture_topic_map.md), [`runtime/tagging_final.sql`](runtime/tagging_final.sql)
+
 ---
 
-## Planned Features
+## Active Work
 
-Items are roughly ordered by priority. Each item links to a detailed plan if one exists.
+### 1. Expose Lectures 1–3 to Students
+> *Let students practice only on material covered in lectures 1–3 (what's been taught so far).*
 
-### 1. Lecture-Based Question Filtering *(tagging done — mapping needs review before continuing)*
-> *Filter questions to only those covered in lectures so far in the semester.*
+**Phase A — Mapping review (in progress)**
+- Review all L1, L2, L3 tagged questions for correctness
+- Reassign any miscategorized questions
 
-Students currently see all questions regardless of course progress. This feature tags each question with the lecture it belongs to, and a "current week" setting controls which questions are visible.
+**Phase B — Question coverage**
+- Confirm counts per lecture (currently L1:32, L2:40, L3:23) are sufficient for practice
+- Author additional questions where thin
 
-**Plan:** [`C:\Users\david\.claude\plans\polymorphic-chasing-marshmallow.md`](C:\Users\david\.claude\plans\polymorphic-chasing-marshmallow.md)
+**Phase C — Student-facing filter (code)**
+- `settings` table with `current_week` key (default: 3)
+- Inject `WHERE max_lecture <= current_week` into `getQuestion()` selection queries
+- Admin UI: read/write `current_week`
+- No user-visible UI yet — just the gate
 
-**Status:** The `max_lecture` column has been added and all 531 questions have been tagged (values 1–9). The tagging SQL is in `runtime/tagging_confident.sql` and has been applied to production.
+---
 
-> ⚠️ **STOP — mapping must be reviewed before going further.**
->
-> The tagging process only read lectures 1–9. The course has lectures 1–12 (lectures 10–12 exist but were not read). As a result, all questions were force-mapped to lectures 1–9, which is almost certainly wrong — questions that actually belong to L10, L11, or L12 have been misassigned to L9 (the last lecture processed). The `max_lecture` values in production should not be used for filtering until the lecture 10–12 PDFs have been read and the affected questions re-mapped correctly.
->
-> **Before continuing:** obtain the L10, L11, L12 lecture materials, re-run the tagging analysis for those lectures, and issue corrective UPDATE statements to move questions from L9 to their true lecture.
-
-Scope:
-- `ALTER TABLE questions ADD COLUMN max_lecture` — NULL = always visible ✅ done
-- One-time tagging SQL — ✅ applied (needs revision for L10–12)
-- New `settings` table with `current_week` key
-- Filter injected into all question-selection queries in `getQuestion()`
-- Admin panel: lecture column, lecture field in add/edit forms, current week control
-- Import tool: optional 7th line or `#lecture:N` file header
+## Planned
 
 ### 2. Telegram Admin Command: `/setweek N`
-> *Let the professor update the current week from Telegram without opening the admin panel.*
+Let the professor update `settings.current_week` from Telegram without opening the admin panel. Checks admin status in `variable_setup.php`.
+Depends on: #1 Phase C.
 
-Add a check in `variable_setup.php` for admin users sending `/setweek N`. Writes to `settings.current_week`.
+### 3. Bot Abuse Prevention
+> *Concern: students may run their own bots/scripts against the Telegram bot to farm points or game leaderboards.*
 
-Depends on: feature #1.
+Possible mitigations to evaluate:
+- Rate limiting per `user_id` (max N answers per minute)
+- Human-interaction signals (minimum think-time between question sent → answer)
+- Anomaly detection on suspiciously fast/perfect runs
+- Captcha / survey checkpoints at milestones
+No solution committed yet — needs investigation of what's actually feasible on Telegram's side.
 
-### 3. Week Auto-Advance
-> *Calculate the current week automatically from the semester start date.*
+### 4. Timezone Fix for Time-Based Badges
+> *Server time differs from Israel time, so badges like "early bird" / "night owl" / daily-streak fire on the wrong clock.*
 
-Store `semester_start_date` in `settings`. Bot computes `current_week = FLOOR(DATEDIFF(NOW(), start_date) / 7) + 1`. Useful for hands-off operation mid-semester.
+Audit all badge logic that reads server time (`time()`, `NOW()`, `DATE()`) and convert to Asia/Jerusalem. Options:
+- Set MySQL session timezone at connection (`SET time_zone = 'Asia/Jerusalem'`)
+- Set PHP default (`date_default_timezone_set`)
+- Explicit conversion at each read site
+Pick one approach and apply consistently.
 
-Depends on: feature #1.
+### 5. Visual Personal Dashboard
+> *A rich, visual stats page per user — not just text.*
 
-### 4. Per-Lecture Leaderboard
-> *Show ranking filtered to questions from a specific lecture.*
+Ideas to explore:
+- Progress bars per lecture
+- Weekly activity heatmap
+- Points trend chart
+- Badges earned / locked grid
+- Delivery: Telegram image render (server-side chart → PNG) vs. web link (mini web view)
+Needs design pass before implementation.
 
-Good for per-class engagement and highlighting students who mastered recent material. New leaderboard query joining `point_log` through `questions.max_lecture`.
+### 6. Week Auto-Advance
+Store `semester_start_date`; compute `current_week = FLOOR(DATEDIFF(NOW(), start_date) / 7) + 1`. Hands-off operation once started.
+Depends on: #1 Phase C.
 
-Depends on: feature #1 (lecture tagging).
+### 7. Per-Lecture Leaderboard
+Rank students by points earned on questions from a specific lecture. Good for per-class engagement.
+Depends on: #1 Phase C.
 
-### 5. Lecture Progress Indicator
-> *Tell a student how many questions they've answered from the current week's lecture.*
+### 8. Lecture Progress Indicator
+Tell a student how many questions they've answered from the current week's lecture. e.g. "ענית על 4 מתוך 12 שאלות מהשיעור השבועי."
+Depends on: #1 Phase C.
 
-Message like: "ענית על 4 מתוך 12 שאלות מהשיעור השבועי." Shown after each answer or on `/stat`.
+### 9. Question Coverage Report in Admin Panel
+Summary table: `Lecture | # Questions | # Answered | Avg Success Rate`. Spots thin lectures.
+Depends on: #1 Phase C.
 
-Depends on: feature #1.
+### 10. Student Unlock Code
+Professor shares a weekly code in class; students enter it to unlock that week's questions. Alternative to auto-advance. Adds `users.student_week` + code in `settings`.
+Depends on: #1 Phase C.
 
-### 6. Question Coverage Report in Admin Panel
-> *Show how many questions exist per lecture so the professor can spot thin lectures.*
+### 11. CSRF Protection in Admin Panel
+Add CSRF token to session, validate on every POST to `admin/backend/save.php`.
 
-A summary table in the admin panel: `Lecture | # Questions | # Answered (total) | Avg Success Rate`.
-
-Depends on: feature #1 (lecture tagging).
-
-### 7. Student Unlock Code
-> *Professor shares a weekly code in class; students enter it to unlock that week's questions.*
-
-Alternative to auto-advance — blends student agency with controlled access. Adds a `student_week` column to `users`, unlocked by a code stored in `settings`.
-
-Depends on: feature #1.
-
-### 8. Question Generation from Lecture Slides
-> *Generate new questions from lecture PDFs for lectures with thin coverage.*
-
-Content task (not purely code): read lecture PDFs, generate 10–20 questions per lecture in import format with `#lecture:N` header, import via updated tool.
-
-Depends on: feature #1 (import tool with lecture header support).
-
-### 9. CSRF Protection in Admin Panel
-> *Add a CSRF token to all admin forms.*
-
-Currently there is no CSRF protection. Add a token to session, validate on every POST to `admin/backend/save.php`.
-
-### 10. SQL Injection Hardening
-> *Migrate raw query interpolation in `bot_functions.php` to prepared statements.*
-
-Tracked in [ARCHITECTURE.md § Known Issues](ARCHITECTURE.md#known-issues--tech-debt). Low urgency (internal tool, controlled user base) but should be addressed before any public deployment.
+### 12. SQL Injection Hardening
+Migrate raw query interpolation in `bot_functions.php` to prepared statements. Tracked in [ARCHITECTURE.md § Known Issues](ARCHITECTURE.md#known-issues--tech-debt).
 
 ---
 
@@ -166,3 +168,4 @@ Not committed to, but worth revisiting:
 - **Group/team challenges** — class-wide challenge mode with shared progress
 - **Notification reminders** — Telegram message to inactive users ("haven't practiced in 3 days")
 - **Exam mode** — timed session with fixed question count and no hints
+- **Question generation from lecture slides** — AI-assisted authoring for thin lectures
