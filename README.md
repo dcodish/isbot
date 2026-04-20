@@ -85,6 +85,9 @@ Telegram user message
 .
 ├── README.md
 ├── CLAUDE.md
+├── ARCHITECTURE.md
+├── ROADMAP.md
+├── DEPLOYMENT.md
 ├── bot-polling.php
 ├── index.php
 ├── variable_setup.php
@@ -93,14 +96,47 @@ Telegram user message
 ├── admin/
 ├── bootstrap/
 ├── tools/
+├── migrations/
+├── badges/
+├── mcp/
+│   └── isbot-db/       # read-only MCP for Claude Desktop
 └── runtime/
 ```
 
 Notes:
 
-- `bootstrap/` contains shared environment and database bootstrapping
-- `tools/` contains maintenance scripts for import/export tasks
-- `runtime/` is for local debug logs and should not be shared as project output
+- `bootstrap/` — shared environment and database bootstrapping
+- `tools/` — maintenance scripts for import/export/insertion tasks
+- `migrations/` — one-off DB change scripts (`YYYY-MM-DD_*.sql`), applied to prod via `scp` + `mysql < file`. See [DEPLOYMENT.md](DEPLOYMENT.md).
+- `badges/` — webp assets for the trophy-closet composite image (one per row in the `badges` DB table)
+- `mcp/isbot-db/` — local MCP server that gives Claude Desktop read-only access to the prod DB via SSH tunnel. Per-machine setup in [`mcp/isbot-db/README.md`](mcp/isbot-db/README.md).
+- `runtime/` — local debug logs and one-off analysis artifacts (gitignored)
+
+## Claude Desktop DB access
+
+The MCP at `mcp/isbot-db/` exposes three read-only tools (`execute_query`, `list_tables`, `describe_table`) to Claude Desktop so you can analyse the prod DB from any conversation without copy-pasting SQL output. It tunnels through SSH and connects as the `isbot_ro` MySQL user (SELECT-only grants).
+
+Per-PC setup (~2 min, repeat once per machine):
+
+```bash
+cd mcp/isbot-db
+python -m venv .venv
+.venv\Scripts\activate        # macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+The `.env` file travels via Dropbox (intentionally gitignored), so it's already filled in on a synced machine. If you set up from a fresh clone instead, copy `.env.example → .env` and fill in values.
+
+Then add an entry to your Claude Desktop config (`%APPDATA%\Claude\claude_desktop_config.json` on Windows, `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+"isbot-db": {
+  "command": "<abs-path>/mcp/isbot-db/.venv/Scripts/python.exe",
+  "args": ["<abs-path>/mcp/isbot-db/server.py"]
+}
+```
+
+Restart Claude Desktop. See [`mcp/isbot-db/README.md`](mcp/isbot-db/README.md) for troubleshooting.
 
 ## Gamification Features Added:
 

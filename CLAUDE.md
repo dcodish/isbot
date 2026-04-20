@@ -39,6 +39,10 @@ Full procedures (deploy, rollback, `.env` editing, webhook management, debugging
 
 **DB migrations**: `scp migrations/YYYY-MM-DD_*.sql root@themathbible.com:/tmp/m.sql` then `ssh root@themathbible.com "mysql -u isbot -p... isquestions_gamified < /tmp/m.sql"`. All migrations should be idempotent (use `IF NOT EXISTS`, `ON DUPLICATE KEY UPDATE`, etc.) so re-running is safe.
 
+## Claude Desktop DB access (MCP)
+
+A read-only MCP server at [`mcp/isbot-db/`](mcp/isbot-db/) lets Claude Desktop query the prod DB directly. It opens its own SSH tunnel to `themathbible.com` and connects as the SELECT-only user `isbot_ro`. Tools exposed: `execute_query`, `list_tables`, `describe_table`. Full per-machine setup and Claude Desktop config snippet in [mcp/isbot-db/README.md](mcp/isbot-db/README.md).
+
 ## Do Not
 
 - Don't add a top-level `config.php` back. Everyone requires `bootstrap/app.php` directly.

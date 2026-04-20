@@ -83,6 +83,8 @@ This document tracks what the bot currently does and what we plan to build next.
 - Deduplication via `processed_updates` table
 - Debug logging under `runtime/` (local only)
 - **Timezone:** PHP and MySQL session both set to Asia/Jerusalem so badges/streaks/leaderboards agree on clock
+- **Research audit log** — every user-facing event (commands, menu clicks, answers, badge awards, survey prompts, clearstats flow) is persisted to the `log` table via `writeLog()`. See the `actions` table for the full event taxonomy.
+- **Claude Desktop DB access** — read-only MCP server at `mcp/isbot-db/` tunnels via SSH and exposes `execute_query` / `list_tables` / `describe_table` to Claude Desktop. Uses SELECT-only user `isbot_ro`. Full setup in `mcp/isbot-db/README.md`.
 
 ---
 
