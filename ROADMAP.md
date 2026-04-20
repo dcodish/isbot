@@ -128,13 +128,25 @@ Concern: students running scripts against the bot to farm points / game leaderbo
 - Anomaly detection on suspiciously fast/perfect runs
 - Captcha / survey checkpoints at milestones
 
-### 8. Visual Personal Dashboard
-A rich visual stats page per user:
-- Progress bars per lecture
-- Weekly activity heatmap
-- Points trend chart
-- Badges-earned grid (could reuse trophy closet)
-- Delivery: Telegram image render (server-side chart → PNG) vs. web link (mini web view). Needs design pass first.
+### 8. Student Learning Dashboard
+A rich, pedagogically-oriented stats view — not just numbers, but **actionable insight into what a student has mastered and where their gaps are**. Should answer: "how am I doing, which lectures should I review, where should I focus next?"
+
+Content:
+- **Per-lecture breakdown**: for each lecture the student has engaged with — questions attempted, success rate, average time-to-answer, last practised date. Colour-coded bars (e.g. green ≥80%, yellow 60–79%, red <60%).
+- **Gap analysis**: lectures with success rate below a threshold, surfaced as "שיעורים שכדאי לחזור עליהם" with direct recommendations.
+- **Trajectory**: points / correct rate over the last 7 and 30 days — is the student improving, plateauing, slipping?
+- **Engagement**: weekly activity heatmap / streak calendar.
+- **Achievements panel**: badges earned + next-closest unearned badges with progress bars (tie in to the trophy closet).
+- **Comparison row (optional)**: student's per-lecture success rate vs class average. Careful framing so it informs rather than discourages — e.g. show only as "you vs median of active students."
+
+Data model: most of this is already queryable — `point_log`, `user_q`, `questions.max_lecture`, `user_badges`, `badge_progress` together give everything we need. Per-question history via `user_q` enables accurate per-lecture success rate computation.
+
+Delivery options:
+- **Telegram image**: one composite PNG per request (server-side chart via GD/Imagick). Heavy but self-contained.
+- **Mini web view**: a dedicated `/dashboard/<token>` page rendered in the Telegram in-app browser. Richer interaction (hover, drill-down), cheaper server-side (no image generation), but adds an auth story.
+- **Hybrid**: text summary in Telegram + a link to the web view for drill-down.
+
+Needs design pass first — decide on delivery channel, wireframe the layout, pick the 5–7 most useful widgets before building. Replaces the current `/stat` and `/level` commands' narrow views.
 
 ### 9. Student Unlock Code
 Professor shares a weekly code in class; students enter it to unlock that week's questions. Alternative to auto-advance. Adds `users.student_week` + code in `settings`.
