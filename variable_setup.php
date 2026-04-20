@@ -188,6 +188,11 @@ if (array_key_exists('callback_query', $update)) {
         } break;
 
 
+        case 'menu_leaderboard': {
+            // User clicked top-level "Leaderboards" — show sub-menu
+            showLeaderboardMenu();
+        } break;
+
         case 'menu_leaderboard_all': {
             // User clicked "All-Time Leaderboard" from menu
             showLeaderboardAllTime();

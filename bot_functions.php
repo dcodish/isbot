@@ -90,13 +90,7 @@ function showMainMenu($chat_id) {
             array('text' => '🏅 אוסף התגים שלי', 'callback_data' => 'menu_badges'),
         ),
         array(
-            array('text' => '🏆 טבלת מובילים - כל הזמנים', 'callback_data' => 'menu_leaderboard_all'),
-        ),
-        array(
-            array('text' => '📆 טבלת מובילים - חודשי', 'callback_data' => 'menu_leaderboard_monthly'),
-        ),
-        array(
-            array('text' => '📅 טבלת מובילים - שבועי', 'callback_data' => 'menu_leaderboard_weekly'),
+            array('text' => '🏆 טבלאות מובילים', 'callback_data' => 'menu_leaderboard'),
         ),
     );
 
@@ -875,6 +869,26 @@ function showBadgesRoom() {
 /////////////////////////////////////////////////////////////////////////
 ///              LEADERBOARD FUNCTIONS                               ////
 /////////////////////////////////////////////////////////////////////////
+
+/**
+ * Sub-menu: lets the user pick which leaderboard to view.
+ */
+function showLeaderboardMenu() {
+    global $chat_id;
+
+    $rlm = "\u{200F}";
+    $message = $rlm . "🏆 טבלאות מובילים\n\n";
+    $message .= $rlm . "בחר את התצוגה הרצויה:";
+
+    $keyboard = array(
+        array(array('text' => '🏆 כל הזמנים', 'callback_data' => 'menu_leaderboard_all')),
+        array(array('text' => '📆 חודשי',     'callback_data' => 'menu_leaderboard_monthly')),
+        array(array('text' => '📅 שבועי',     'callback_data' => 'menu_leaderboard_weekly')),
+        array(array('text' => '🔙 חזרה לתפריט', 'callback_data' => 'menu_back')),
+    );
+
+    bot_message($chat_id, $message, array('inline_keyboard' => $keyboard));
+}
 
 /**
  * Show all-time leaderboard (top 10 + user position)
