@@ -256,8 +256,20 @@ function getQuestion() {
     $query = null;
     $question_result = null;
 
+    // Probation: questions with numofanswers < 5 are "unrated" and get mixed into every level
+    // at the percentages below. Once they accumulate 5 answers, normal success-rate classification
+    // takes over. Levels 3 and 4 respect the per-user exclusion (no repeats).
+    $probation_pcts = [1 => 30, 2 => 25, 3 => 20, 4 => 15];
+    $probation_pct = $probation_pcts[$level] ?? 0;
+    if ($probation_pct > 0 && rand(1, 100) <= $probation_pct) {
+        $probation_exclusion = ($level >= 3) ? "AND " . buildExclusionClause($safe_user_id) : "";
+        $query = "SELECT * FROM questions WHERE numofanswers < 5 $probation_exclusion AND $lectureFilter ORDER BY RAND() LIMIT 1";
+        $question_result = executeQuestionQuery($db, $query, "L$level-probation");
+    }
+
     // Implement 4-level logic with probability buckets (IGNORING difficulty field - using only success rate)
-    switch ($level) {
+    // Skipped if probation already produced a question above.
+    if ($question_result === null) switch ($level) {
         case 1: {
             // Level 1: success_rate >= 0.80, CAN repeat
             $query = "SELECT * FROM questions WHERE numofanswers > 0 AND (numofcorrectanswers / numofanswers) >= 0.80 AND $lectureFilter ORDER BY RAND() LIMIT 1";
