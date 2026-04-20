@@ -70,6 +70,17 @@ if (array_key_exists('callback_query', $update)) {
     $pieces = explode(":", $callBacktext);
     $cmd =  $pieces[0]; //options are skip or bad
     $text='callback';
+}
+
+// Session boundary check: if the user returns after a gap, wipe the question
+// messages from their previous session before handling the new interaction.
+if ($user_id > 0 && $chat_id > 0) {
+    maybeStartNewSession($user_id, $chat_id);
+}
+
+if (isset($update['callback_query'])) {
+    $pieces = explode(":", $callBacktext);
+    $cmd = $pieces[0];
     switch ($cmd) {
         case 'Bad' : {
             writeLog(4);

@@ -198,6 +198,98 @@ function writeLog ($op, $additional=0) {
 
 
 /**
+ * Session-bounded question cleanup (content-theft mitigation).
+ *
+ * When a user returns after more than settings.session_gap_minutes of inactivity,
+ * the question messages from their previous session are removed from the chat.
+ * Delete is tried first (works for private-chat bot messages ≤ 48h old); if that
+ * fails, the message is edited to a generic placeholder. Feedback, stats,
+ * leaderboards, menus, and badges are NOT tracked or cleaned — only the question
+ * stem and the "what's the correct answer?" prompt with its answer buttons.
+ */
+function getSessionGapMinutes() {
+    global $db;
+    static $cached = null;
+    if ($cached !== null) return $cached;
+    $res = mysqli_query($db, "SELECT setting_value FROM settings WHERE setting_key = 'session_gap_minutes' LIMIT 1");
+    if ($res && mysqli_num_rows($res) > 0) {
+        $row = mysqli_fetch_assoc($res);
+        mysqli_free_result($res);
+        $cached = max(1, intval($row['setting_value']));
+    } else {
+        if ($res) mysqli_free_result($res);
+        $cached = 30;
+    }
+    return $cached;
+}
+
+function logSessionQuestionMessage($user_id, $message_id) {
+    global $db;
+    $uid = intval($user_id);
+    $mid = intval($message_id);
+    if ($uid <= 0 || $mid <= 0) return;
+    mysqli_query($db, "INSERT INTO session_question_messages (user_id, message_id) VALUES ($uid, $mid)");
+}
+
+function cleanupPreviousSessionMessages($user_id, $chat_id) {
+    global $db;
+    $uid = intval($user_id);
+    $cid = intval($chat_id);
+    $res = mysqli_query($db, "SELECT id, message_id FROM session_question_messages WHERE user_id = $uid AND cleaned = 0 ORDER BY id ASC");
+    if (!$res) return;
+
+    $done = [];
+    while ($row = mysqli_fetch_assoc($res)) {
+        $mid = intval($row['message_id']);
+        // Prefer delete — cleanest UX. Falls back to edit for messages > 48h old
+        // or any other deletion failure (Telegram returns ok:false).
+        $delResp = bot("deleteMessage?chat_id={$cid}&message_id={$mid}");
+        if (!is_array($delResp) || !($delResp['ok'] ?? false)) {
+            $text = urlencode("שאלה זו הוסרה");
+            bot("editMessageText?chat_id={$cid}&message_id={$mid}&text={$text}");
+        }
+        $done[] = intval($row['id']);
+    }
+    mysqli_free_result($res);
+
+    if ($done) {
+        $in = implode(',', $done);
+        mysqli_query($db, "UPDATE session_question_messages SET cleaned = 1 WHERE id IN ($in)");
+    }
+}
+
+/**
+ * Called at the start of every user interaction. If the gap since the user's
+ * last activity exceeds settings.session_gap_minutes, clean up the previous
+ * session's question messages and reset. Updates users.last_interaction_at.
+ */
+function maybeStartNewSession($user_id, $chat_id) {
+    global $db;
+    $uid = intval($user_id);
+    if ($uid <= 0) return;
+
+    $gap_secs = getSessionGapMinutes() * 60;
+
+    $res = mysqli_query($db, "SELECT last_interaction_at FROM users WHERE id = $uid");
+    if ($res && mysqli_num_rows($res) > 0) {
+        $row = mysqli_fetch_assoc($res);
+        mysqli_free_result($res);
+        $last = $row['last_interaction_at'];
+        if ($last !== null) {
+            $last_ts = strtotime($last);
+            if ($last_ts !== false && (time() - $last_ts) > $gap_secs) {
+                cleanupPreviousSessionMessages($user_id, $chat_id);
+            }
+        }
+    } else {
+        if ($res) mysqli_free_result($res);
+    }
+
+    // Affects 0 rows for brand-new users whose row isn't written yet — harmless.
+    mysqli_query($db, "UPDATE users SET last_interaction_at = NOW() WHERE id = $uid");
+}
+
+/**
  * Reads settings.current_week (defaults to 12 = no restriction if the row is missing).
  * Cached per request via static to avoid repeated lookups within one getQuestion() call.
  */
@@ -445,8 +537,11 @@ function getQuestion() {
     $q3 = $rlm . "3. " . $answers[$ansLocations[2]-1];
     $q4 = $rlm . "4. " . $answers[$ansLocations[3]-1];
     $q = $rlm . "$q_text \n$q1 \n$q2 \n$q3 \n$q4 \n .";
-    bot_message($chat_id, $q );
-    
+    $qResp = bot_message($chat_id, $q);
+    if (isset($qResp['result']['message_id'])) {
+        logSessionQuestionMessage($user_id, $qResp['result']['message_id']);
+    }
+
     $ar = array();
     $qid = $fetch['id'];
 
@@ -488,7 +583,10 @@ function getQuestion() {
     array_push($ar, $ar31);
 
     $markup = array('inline_keyboard' => $ar);
-    bot_message($chat_id, 'מה התשובה הכי נכונה?', $markup);
+    $promptResp = bot_message($chat_id, 'מה התשובה הכי נכונה?', $markup);
+    if (isset($promptResp['result']['message_id'])) {
+        logSessionQuestionMessage($user_id, $promptResp['result']['message_id']);
+    }
 
     return true;
 }
