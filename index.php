@@ -142,9 +142,11 @@ switch ($text) {
         $level = intval($fetch['level']);
         $currentRun = intval($fetch['current_run']);
         $rlm = "\u{200F}";
+        // LRI/PDI isolate numeric tokens so minus + digits stay as "-1", not "1-"
+        $lri = "\u{2066}"; $pdi = "\u{2069}";
         $msg  = $rlm . "📊 הרמה שלך\n\n";
-        $msg .= $rlm . "🎯 רמה נוכחית: {$level}\n";
-        $msg .= $rlm . "📈 ציון בתוך השלב: {$currentRun}\n\n";
+        $msg .= $rlm . "🎯 רמה נוכחית: {$lri}{$level}{$pdi}\n";
+        $msg .= $rlm . "📈 ציון בתוך השלב: {$lri}{$currentRun}{$pdi}\n\n";
         $msg .= $rlm . "━━━━━━━━━━━━━━\n";
         $msg .= $rlm . "הסבר על הרמות:\n";
         $msg .= $rlm . "1️⃣ כל השאלות רנדומליות וקלות\n";
