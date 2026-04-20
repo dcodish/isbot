@@ -49,6 +49,7 @@ if ($num > 0) {
 switch ($text) {
 
     case '/start': {
+        writeLog(6); // Start
         $query = "SELECT * FROM users WHERE id=" . $user_id;
         $result = mysqli_query($db, $query);
         $num = mysqli_num_rows($result);
@@ -85,11 +86,12 @@ switch ($text) {
 
     case '/menu':
     case '/תפריט': {
-        // Show main menu
+        writeLog(19); // MenuCommand
         showMainMenu($chat_id);
     } break;
 
     case '/stats' : {
+        writeLog(5); // Stat
         $safe_uid = intval($user_id);
 
         $query = "SELECT COUNT(*) AS totalAnswered, COALESCE(SUM(numofsuccess),0) AS okCount, COALESCE(SUM(numoffailure),0) AS wrongCount FROM user_q WHERE userid = $safe_uid";
@@ -120,6 +122,7 @@ switch ($text) {
     } break;
 
     case '/clearstats' : {
+        writeLog(31); // ClearStatsRequest
         // Show confirmation prompt rather than acting immediately — destructive action.
         $rlm = "\u{200F}";
         $msg  = $rlm . "⚠️ האם אתה בטוח שברצונך לאפס את ההיסטוריה?\n\n";
@@ -140,6 +143,7 @@ switch ($text) {
     } break;
 
     case '/level' : {
+        writeLog(8); // Level
         $safe_uid = intval($user_id);
         $query = "select level,current_run from users where id=$safe_uid";
         $result = mysqli_query($db, $query);
@@ -205,6 +209,7 @@ switch ($text) {
     } break;
 
     case '/changenickname' : {
+        writeLog(30); // NicknameChangeRequest
         // Allow user to change their nickname
         setAwaitingNickname($user_id, true);
         $message = "🔄 *שינוי כינוי*\n\n";

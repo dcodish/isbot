@@ -709,6 +709,7 @@ function getSurveyQuestion() {
     array_push($ar, $ar31);
 
     $lastSQ = 1;
+    writeLog(15, $qid); // S-asked: survey question shown (additional_value = survey question_id)
     $markup = array('inline_keyboard' => $ar);
     bot_message($chat_id, "מה התשובה?", $markup);
 

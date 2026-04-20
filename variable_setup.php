@@ -194,43 +194,43 @@ if (isset($update['callback_query'])) {
         } break;
 
         case 'menu_start': {
-            // User clicked "Start Playing" from menu
+            writeLog(20); // MenuStart
             showNextQ();
         } break;
 
 
         case 'menu_leaderboard': {
-            // User clicked top-level "Leaderboards" — show sub-menu
+            writeLog(22); // MenuLeaderboardRoot
             showLeaderboardMenu();
         } break;
 
         case 'menu_leaderboard_all': {
-            // User clicked "All-Time Leaderboard" from menu
+            writeLog(23); // MenuLeaderboardAll
             showLeaderboardAllTime();
         } break;
 
         case 'menu_leaderboard_monthly': {
-            // User clicked "Monthly Leaderboard" from menu
+            writeLog(25); // MenuLeaderboardMonthly
             showLeaderboardMonthly();
         } break;
 
         case 'menu_leaderboard_weekly': {
-            // User clicked "Weekly Leaderboard" from menu
+            writeLog(24); // MenuLeaderboardWeekly
             showLeaderboardWeekly();
         } break;
 
         case 'menu_badges': {
-            // User clicked "My Badges" from menu
+            writeLog(21); // MenuBadges
             showBadgesRoom();
         } break;
 
         case 'menu_back': {
-            // User clicked "Back to Menu" button
+            writeLog(26); // MenuBack
             showMainMenu($chat_id);
         } break;
 
         case 'clearstats_confirm': {
-            // User confirmed clearstats — perform the reset.
+            writeLog(32); // ClearStatsConfirm
             $safe_uid = intval($user_id);
             mysqli_query($db, "DELETE FROM user_q WHERE userid = $safe_uid");
             mysqli_query($db, "UPDATE users SET level = 1, current_run = 0 WHERE id = $safe_uid");
@@ -239,6 +239,7 @@ if (isset($update['callback_query'])) {
         } break;
 
         case 'clearstats_cancel': {
+            writeLog(33); // ClearStatsCancel
             $rlm = "\u{200F}";
             bot_message($chat_id, $rlm . "הפעולה בוטלה. ההיסטוריה נשמרה.");
         } break;

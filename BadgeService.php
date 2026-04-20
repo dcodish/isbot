@@ -66,6 +66,13 @@ class BadgeService {
             return false;
         }
 
+        // Log the badge award to the audit log (research requirement).
+        // writeLog() uses globals $user_id/$chat_id, which match $this->user_id/$this->chat_id
+        // in the call path here — safe to invoke directly.
+        if (function_exists('writeLog')) {
+            writeLog(40, $badge_id); // BadgeEarned, additional_value = badge_id
+        }
+
         // Award bonus points if any
         if ($badge['points_reward'] > 0) {
             $points = intval($badge['points_reward']);
