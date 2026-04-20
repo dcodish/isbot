@@ -99,6 +99,19 @@ Store `semester_start_date` in `settings`. Bot computes `current_week = FLOOR(DA
 ### 3. max_lecture in Admin Add/Edit Forms
 The admin panel shows a `שיעור` column and lets you filter by it, but the Add/Edit modals don't include a field for it. Authors have to use the question-writer agent or SQL to set/change `max_lecture`. Fill in the modal fields.
 
+### 3a. Unified Settings Admin Page
+Consolidate all tunable parameters into one admin UI so the professor doesn't need SQL to adjust the bot's behaviour. Currently scattered:
+- `settings` table: `current_week`, `session_gap_minutes` (and future keys)
+- `gamification` table: per-level `upgrade_at` / `downgrade_at` thresholds
+- `point_rules` table: points per (action × question level)
+- Hardcoded constants in PHP worth exposing: probation threshold (`numofanswers < 5`), probation percentages per level (30/25/20/15), leaderboard window size (3 above/below in `renderLeaderboard`), badge thresholds in `BadgeService`
+- Future: daily question cap, rate-limit windows, skip-rate thresholds (once those land)
+
+Work split naturally:
+- Move hardcoded values into the `settings` table with sensible keys and defaults
+- Build a single admin page that auto-renders a form row for every `settings` row plus edit forms for `gamification` / `point_rules` tables
+- Validate ranges on update (e.g. percentages 0–100, minutes 1–1440)
+
 ### 4. Per-Lecture Leaderboard
 Rank students by points earned on questions within a specific lecture. Good for per-class engagement and highlighting recent-material mastery.
 
