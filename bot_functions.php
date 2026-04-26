@@ -185,10 +185,17 @@ function sendDocument($chat_id, $caption, $title_id) {
 
 
 function writeLog ($op, $additional=0) {
-    global $db, $chat_id, $user_id; 
-    $query="insert into log(userid,action_type,additional_value) VALUES('$user_id',$op,$additional)";
-    mysqli_query($db, $query);
-    
+    global $db, $chat_id, $user_id;
+    $query = "insert into log(userid,action_type,additional_value) VALUES('$user_id',$op,$additional)";
+    // Audit-log writes must never break request flow: a missing user row, a
+    // schema oddity, a transient MySQL hiccup — all should be logged and
+    // swallowed. Otherwise a brand-new /start (which writeLogs *before* the
+    // user is inserted into users) takes the whole webhook down.
+    try {
+        mysqli_query($db, $query);
+    } catch (\Throwable $e) {
+        error_log("writeLog failed (op=$op uid=$user_id add=$additional): " . $e->getMessage());
+    }
     return true;
 }
 
