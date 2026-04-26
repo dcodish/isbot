@@ -72,6 +72,14 @@ if (array_key_exists('callback_query', $update)) {
     $text='callback';
 }
 
+// Make sure the user has a row in `users` before any handler runs. Stale
+// buttons in the chat can deliver callbacks before the user ever sends /start;
+// without this, recordAnswer / writeLog / etc. would hit a foreign-key fatal
+// (user_q.fk_user_userq, badge_progress.fk_user_badge, …). Idempotent.
+if ($user_id > 0 && $chat_id > 0) {
+    ensureUserExists($user_id, $first_name ?? '', $last_name ?? '');
+}
+
 // Session boundary check: if the user returns after a gap, wipe the question
 // messages from their previous session before handling the new interaction.
 if ($user_id > 0 && $chat_id > 0) {

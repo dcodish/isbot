@@ -199,6 +199,29 @@ function writeLog ($op, $additional=0) {
     return true;
 }
 
+/**
+ * Idempotently insert a row into users for the given Telegram user_id, so
+ * downstream FK constraints (user_q, user_badges, badge_progress, user_survey,
+ * point_log) trivially hold. Call at the top of every interaction — this is
+ * the bulwark against "user clicked an old button before /start" races.
+ *
+ * Safe to call millions of times; INSERT IGNORE makes the duplicate-key case a
+ * fast no-op.
+ */
+function ensureUserExists($user_id, $first_name = '', $last_name = '') {
+    global $db;
+    if ($user_id === null || $user_id === '' || (is_numeric($user_id) && $user_id <= 0)) return;
+    $safe_uid = mysqli_real_escape_string($db, (string)$user_id);
+    $safe_fn  = mysqli_real_escape_string($db, (string)($first_name ?? ''));
+    $safe_ln  = mysqli_real_escape_string($db, (string)($last_name ?? ''));
+    $sql = "INSERT IGNORE INTO users (id, first_name, last_name, level, current_run) VALUES ('$safe_uid', '$safe_fn', '$safe_ln', 1, 0)";
+    try {
+        mysqli_query($db, $sql);
+    } catch (\Throwable $e) {
+        error_log("ensureUserExists failed for uid=$user_id: " . $e->getMessage());
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////
 ///                    DB functions                                  ////
 /// /////////////////////////////////////////////////////////////////////
@@ -1125,7 +1148,15 @@ function showLeaderboardMonthly() {
 function recordAnswer($qid, $type){
     // type can be: 1-correct, 2-wrong, 3-bad
     global $db, $user_id, $chat_id;
-    
+
+    // Defensive: stale buttons or malformed callbacks can deliver an empty
+    // qid, which previously walked into a SELECT with no WHERE value, returned
+    // null, and crashed the request with a syntax error in the next UPDATE.
+    $qid = intval($qid);
+    if ($qid <= 0) {
+        error_log("recordAnswer: invalid qid (uid=$user_id type=$type)");
+        return;
+    }
 
     $query = "SELECT * FROM questions WHERE id=".$qid;
     $result = mysqli_query($db, $query);
