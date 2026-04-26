@@ -1162,9 +1162,11 @@ function recordAnswer($qid, $type){
     $result = mysqli_query($db, $query);
     $num = mysqli_num_rows($result);
     if ($num == 0) {
-        $totalCorrectAns = 1;
-        $numOfAns=1;
-        $reportedBad=1;
+        // Question was deleted (admin race) or never existed. Don't write
+        // user_q / point_log rows that would FK-fail; just bail cleanly.
+        if ($result) mysqli_free_result($result);
+        error_log("recordAnswer: question $qid not found, skipping (uid=$user_id type=$type)");
+        return;
     } else {
         $fetch = mysqli_fetch_assoc($result);
         $totalCorrectAns = $fetch['numofcorrectanswers'];
