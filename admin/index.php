@@ -103,6 +103,7 @@ if ($ccres) {
 					<div class="col-sm-6">
 						<a href="#addQModal" class="btn btn-success" data-toggle="modal"><i class="material-icons">&#xE147;</i> <span>Add New Question</span></a>
 						<a href="JavaScript:void(0);" class="btn btn-danger" id="delete_multiple"><i class="material-icons">&#xE15C;</i> <span>Delete</span></a>
+						<a href="stats.php" class="btn btn-info"><i class="material-icons">&#xE88A;</i> <span>Stats</span></a>
 						<a href="logout.php" class="btn btn-warning"><i class="material-icons">&#xE8AC;</i> <span>Logout</span></a>
 					</div>
                 </div>
