@@ -72,19 +72,21 @@ After writing the draft, stop and report back to the user:
 
 # Approval and DB insertion
 
+Questions live on the **prod** DB. Insert by generating a SQL batch file and applying it to prod via `scp` + `mysql`. Do **not** use `tools/insert_questions.php` or assume a local DB — that path is deprecated and caused repeated failures.
+
 When the user says "insert" / "approve" / "write to DB" / equivalent:
 
 1. Re-read the draft file — the user may have edited or deleted questions.
-2. Parse the remaining questions into a JSON array. Each entry must have:
-   - `question_text` (string, the stem — strip the `## Qn [complexity] L<X>` header)
-   - `option1`, `option2`, `option3`, `option4` (strings)
-   - `correctans` (integer 1-4)
-   - `max_lecture` (integer 1-12)
-3. Write the JSON to a sibling file `runtime/drafts/draft-....json`.
-4. Run `php tools/insert_questions.php <json-path>` via Bash. Report the output (inserted IDs, any failures).
-5. If any failed, surface the errors to the user — don't silently ignore.
+2. Generate a SQL file at `migrations/data/YYYY-MM-DD_L<X>-new-questions.sql`. **`migrations/data/` is gitignored — question data is never committed.** Mirror an existing batch such as `migrations/data/2026-05-13_L5-new-questions.sql`: a single multi-row INSERT with columns
+   `(question_text, option1, option2, option3, option4, correctans, difficulty, max_lecture, reportedbad, numofanswers, numofcorrectanswers)`.
+   - Strip the `## Qn [complexity] L<X>` header from each stem; `correctans` = the draft's **Correct: N**.
+   - **Every row:** `difficulty = 1`, `reportedbad = 0`, `numofanswers = 0`, `numofcorrectanswers = 0`. Difficulty is always 1 — the bot reclassifies from answer success-rate, so authored difficulty is irrelevant.
+   - `max_lecture` = the question's lecture number.
+   - **Escaping:** single-quote each value and double any literal apostrophe (`'` → `''`). Prefer the Hebrew gershayim (״, U+05F4) inside acronyms like צה״ל to avoid quoting issues. Straight double-quotes (`"`) inside text are safe.
+3. Apply to prod: `scp` the file to the server, then `mysql ... --default-character-set=utf8mb4 isquestions_gamified < file`. The charset flag is **required** or Hebrew is mangled. (If you lack SSH access, hand the file to the human operator to apply.)
+4. Verify and report: row count for that `max_lecture` before/after (delta must equal the batch size), no `correctans` outside 1–4, spot-check one row for clean Hebrew, and report the inserted ID range plus any failures.
 
-Do **not** insert without explicit user approval. Do **not** modify existing rows. Do **not** touch prod directly — `insert_questions.php` uses the local `.env` DB connection; prod replication is the user's responsibility.
+Do **not** insert without explicit user approval. Do **not** modify existing rows here — re-tagging/answer fixes are handled by the human via a separate `migrations/data/..._cleanup.sql` (or the admin panel).
 
 # Tone when communicating with the user
 

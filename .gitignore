@@ -19,3 +19,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 /vendor/
+
+# Data, not code — applied to prod but kept out of git.
+# (Schema migrations under migrations/ ARE committed; question/exam data is NOT.)
+migrations/data/
+runtime/
+tmp/

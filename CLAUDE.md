@@ -10,7 +10,9 @@ Guidance for Claude Code when working in this repo. System architecture, message
 - **Hebrew UI**: user-facing strings are in Hebrew. Keep them consistent in tone with existing messages.
 - **RTL rendering**: prepend U+200F (RLM) to any line that might start with Latin or digits but needs RTL paragraph direction (question options, leaderboard rows, badge captions). Without it, Telegram flips lines starting with `GPU`/`NPU`/digits to LTR and the numbering scrambles.
 - **Settings**: tunable parameters live in the `settings` table (key/value). Current keys: `current_week`, `session_gap_minutes`. When adding a new knob, prefer a `settings` row with a default rather than a PHP constant.
-- **Migrations**: one-off DB changes go in `migrations/YYYY-MM-DD_description.sql`, are applied to prod via `scp` + `mysql < file`, and are committed to the repo for history. No migration runner — the files are the audit log.
+- **Migrations**: one-off DB changes go in `migrations/YYYY-MM-DD_description.sql`, applied to prod via `scp` + `mysql < file`. No migration runner — the files are the audit log.
+  - **Schema/structural** migrations (tables, columns, indexes, FKs, `settings` rows) are **code** — commit them for history.
+  - **Question/exam data** SQL (new questions, re-tagging `max_lecture`, answer fixes) is **data, not code** — put it in `migrations/data/`, which is **gitignored**. Apply it to prod the same way, but never commit it. New questions seed at `difficulty = 1`; the bot reclassifies from answer success-rate.
 - **Timezone**: PHP and MySQL are both set to `Asia/Jerusalem`. PHP via `date_default_timezone_set()` in `bootstrap/app.php`; MySQL via `SET time_zone = 'Asia/Jerusalem'` at connection. Prod has named-tz tables loaded (`mysql_tzinfo_to_sql`); a future host without that would silently fall back to UTC.
 
 ## Gotchas
@@ -37,7 +39,7 @@ Full procedures (deploy, rollback, `.env` editing, webhook management, debugging
 
 **Typical deploy**: `git push`, then on prod `git fetch origin && git reset --hard origin/main`. No build step, no restart.
 
-**DB migrations**: `scp migrations/YYYY-MM-DD_*.sql root@themathbible.com:/tmp/m.sql` then `ssh root@themathbible.com "mysql -u isbot -p... isquestions_gamified < /tmp/m.sql"`. All migrations should be idempotent (use `IF NOT EXISTS`, `ON DUPLICATE KEY UPDATE`, etc.) so re-running is safe.
+**DB migrations**: `scp migrations/YYYY-MM-DD_*.sql root@themathbible.com:/tmp/m.sql` then `ssh root@themathbible.com "mysql -u isbot -p... isquestions_gamified < /tmp/m.sql"`. Schema migrations should be idempotent (use `IF NOT EXISTS`, `ON DUPLICATE KEY UPDATE`, etc.) so re-running is safe. Question-data batches live in `migrations/data/` (gitignored) — apply them with `--default-character-set=utf8mb4` so the Hebrew isn't mangled.
 
 ## Claude Desktop DB access (MCP)
 
