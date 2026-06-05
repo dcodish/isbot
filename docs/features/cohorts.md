@@ -1,6 +1,7 @@
 # Feature Spec — Cohorts / Groups
 
-**Status:** in design (not built) · **Created:** 2026-06-05
+**Status:** Phases 0–2 deployed (per-cohort week live + admin cohort management);
+Phases 3–6 pending · **Created:** 2026-06-05 · **Deployed:** 2026-06-05
 **Extends:** [../requirements.md](../requirements.md) · **Decisions:**
 [../design.md](../design.md) ADR-006/007/008
 
@@ -158,7 +159,8 @@ the risky piece (the gate) ships last and only after the rest is proven.
 - Have a **test Telegram account** that is *not* an existing user, to exercise
   the new-user path without touching real students.
 
-### Phase 0 — Migration (additive data only, zero behaviour change)
+### Phase 0 — Migration (additive data only, zero behaviour change) ✅ DONE 2026-06-05
+Verified on prod: 72/72 users assigned, 0 unassigned; default cohort week == 8 (old global week).
 `migrations/2026-06-05_cohorts.sql`, idempotent:
 1. `CREATE TABLE IF NOT EXISTS cohorts (...)` (§3.1).
 2. `ALTER TABLE users ADD COLUMN cohort_id INT NULL` + FK `ON DELETE SET NULL`.
@@ -170,7 +172,8 @@ the risky piece (the gate) ships last and only after the rest is proven.
   Default cohort's `current_week` == old global value.
 - **Rollback:** drop column + table (only loses cohort assignments; harmless).
 
-### Phase 1 — Per-user read path, with safe fallback
+### Phase 1 — Per-user read path, with safe fallback ✅ DONE 2026-06-05
+Verified on prod: all 72 users resolve to week 8 via the cohort join — identical filter to before.
 - `getCurrentWeek($user_id = null)`: if the user has a `cohort_id`, return that
   cohort's week (validated 1–12); **else fall back to the existing global
   lookup** (today's exact behaviour). Optional param ⇒ the lone other-context
@@ -183,7 +186,10 @@ the risky piece (the gate) ships last and only after the rest is proven.
   NULL-cohort user (temporarily) still works via fallback.
 - **Rollback:** `git revert` (returns to global-only resolution).
 
-### Phase 2 — Admin cohort management (admin-only, no student impact)
+### Phase 2 — Admin cohort management (admin-only, no student impact) ✅ DONE 2026-06-05
+Built `admin/cohorts.php`: list cohorts (week inline-editable, colour, active toggle, #users),
+create new cohort (Hebrew name + starting week + colour). Nav links added across admin pages.
+Legacy global-week form in `admin/index.php` intentionally kept for now (retire in Phase 6).
 - Cohort CRUD + per-cohort week editing so real cohorts (e.g. *אביב 2026*) exist
   before any user-facing change. The professor renames the default cohort to the
   real current semester here.

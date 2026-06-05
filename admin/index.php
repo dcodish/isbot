@@ -79,6 +79,12 @@ if ($ccres) {
     <div class="container">
 	<p id="success"></p>
 
+        <nav style="margin-top:18px; margin-bottom:10px;">
+            <a href="index.php" class="btn btn-primary btn-sm">ניהול שאלות</a>
+            <a href="stats.php" class="btn btn-default btn-sm">לוח נתונים</a>
+            <a href="cohorts.php" class="btn btn-default btn-sm">ניהול קבוצות</a>
+        </nav>
+
         <div class="panel panel-default" style="margin-top: 20px;">
             <div class="panel-heading"><strong>Current Week</strong> (controls which lectures' questions are visible to students)</div>
             <div class="panel-body">
