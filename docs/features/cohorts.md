@@ -217,8 +217,11 @@ Legacy global-week form in `admin/index.php` intentionally kept for now (retire 
 - **Rollback:** revert admin changes; no student-facing surface touched.
 
 ### Phase 3 — User self-service group switch (OPTIONAL, no gate yet) ✅ DONE 2026-06-05
-Self-switch is a **slash command only** (`/סמסטר`, `/group`) — the menu button was
-removed to make it less discoverable and prevent accidental taps. The change flow
+Self-switch is a **slash command only** (`/semester`, with `/סמסטר` as a hidden
+alias) — the menu button was removed to make it less discoverable and prevent
+accidental taps. `/semester` is registered in Telegram's command menu via
+`tools/set_commands.php` (command names must be English [a-z0-9_]; descriptions
+are Hebrew). The change flow
 is **two-step**: tap a semester → `pickgroup:<id>` shows a confirm ("אתה עומד
 לעבור ל-X… להמשיך?") → `setgroup:<id>` (✅ אשר) commits, `cancel_group` (❌ ביטול)
 aborts. Onboarding stays a **direct** tap (`setgroup:<id>`, no confirm — nothing

@@ -101,7 +101,7 @@ switch ($text) {
         showMainMenu($chat_id);
     } break;
 
-    case '/group':
+    case '/semester':
     case '/סמסטר': {
         writeLog(35); // MenuChangeGroup
         showCohortPicker($chat_id, false);
