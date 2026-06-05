@@ -1,7 +1,8 @@
 # Feature Spec — Cohorts / Groups
 
-**Status:** Phases 0–2 deployed (per-cohort week live + admin cohort management);
-Phases 3–6 pending · **Created:** 2026-06-05 · **Deployed:** 2026-06-05
+**Status:** Phases 0–3 deployed + Phase 4 deployed-dormant (gate code live,
+`cohort_gate_enabled = 0` kill switch OFF); Phases 5–6 pending ·
+**Created:** 2026-06-05 · **Deployed:** 2026-06-05
 **Extends:** [../requirements.md](../requirements.md) · **Decisions:**
 [../design.md](../design.md) ADR-006/007/008
 
@@ -131,6 +132,19 @@ Mirror the existing inline-keyboard / `cmd:arg` callback pattern parsed by
 3. `UPDATE users SET cohort_id = <default_id> WHERE cohort_id IS NULL`.
 4. Keep `settings.current_week` as the fallback. *(committed schema migration)*
 
+### 3.6 Admin user (decided 2026-06-05)
+The admin (Telegram id from `BOT_ADMIN_USER_ID`, currently 580622693 "TheBoss")
+belongs to a dedicated **inactive** cohort `צוות` at **week 12** (full question
+visibility for testing). Rationale: a NULL cohort would (a) fall back to the
+global week — *not* full visibility — and (b) trip the Phase-4 mandatory gate,
+forcing an exemption. An admin cohort solves both with no special-case code, and
+`active = 0` keeps it out of the student picker. Applied as a one-off DB op
+(data, not schema), not a committed migration.
+
+**Phase-3 consequence:** the `setgroup:<id>` handler MUST reject cohorts where
+`active = 0`, so a student can never manually join `צוות`. (The `/group` picker
+already lists only active cohorts, but validate on submit too.)
+
 ---
 
 ## 4. Implementation & Rollout Plan (do-no-harm)
@@ -197,14 +211,21 @@ Legacy global-week form in `admin/index.php` intentionally kept for now (retire 
   suspenders — it remains the documented fallback). Retire it only in Phase 6.
 - **Rollback:** revert admin changes; no student-facing surface touched.
 
-### Phase 3 — User self-service group switch (OPTIONAL, no gate yet)
+### Phase 3 — User self-service group switch (OPTIONAL, no gate yet) ✅ DONE 2026-06-05
+`/group` + `/קבוצה` commands, "🔀 החלף קבוצה" menu entry, `setgroup:<id>` callback
+(rejects inactive cohorts, so students can't join צוות), `menu_group` callback.
 - `/group` command + `setgroup:<id>` callback + "החלף קבוצה" menu entry. Users
   *may* switch; nobody is forced. Validate target cohort is active.
 - **Why safe:** purely additive capability; no one is blocked, default
   assignment unchanged unless the user opts to switch.
 - **Rollback:** revert; the command/menu entry simply disappear.
 
-### Phase 4 — Mandatory onboarding gate (the only risky step) — flagged
+### Phase 4 — Mandatory onboarding gate (the only risky step) — flagged ✅ CODE DEPLOYED 2026-06-05 (flag OFF)
+`checkCohortRequired()` wired into both paths (index.php text path after the
+nickname gate; variable_setup.php callback path via `else switch`, allowing
+`setgroup`). Onboarding hook in `handleNicknameInput()` shows the picker after a
+new user sets their nickname. Behind `settings.cohort_gate_enabled` (=0). Flip to
+1 to activate after testing with a fresh Telegram account.
 - Add `checkCohortRequired($user_id, $chat_id)` invoked **after** the nickname
   gate (text path in `index.php` ~line 40; callback path in `variable_setup.php`
   before the switch, always allowing `setgroup:`). Order: nickname → cohort.

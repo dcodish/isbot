@@ -89,6 +89,14 @@ if ($user_id > 0 && $chat_id > 0) {
 if (isset($update['callback_query'])) {
     $pieces = explode(":", $callBacktext);
     $cmd = $pieces[0];
+
+    // Cohort onboarding gate (callback path): a user with no cohort may only
+    // pick a group. setgroup is always allowed so they can satisfy the gate.
+    // No-op while settings.cohort_gate_enabled is off (getUserCohortId of an
+    // assigned user is non-null anyway, so existing users are never affected).
+    if (cohortGateEnabled() && $cmd !== 'setgroup' && getUserCohortId($user_id) === null) {
+        showCohortPicker($chat_id, true);
+    } else
     switch ($cmd) {
         case 'Bad' : {
             writeLog(4);
@@ -250,6 +258,26 @@ if (isset($update['callback_query'])) {
             writeLog(33); // ClearStatsCancel
             $rlm = "\u{200F}";
             bot_message($chat_id, $rlm . "הפעולה בוטלה. ההיסטוריה נשמרה.");
+        } break;
+
+        case 'setgroup': {
+            $cid = intval($pieces[1] ?? 0);
+            $name = setUserCohort($user_id, $cid);
+            $rlm = "\u{200F}";
+            if ($name !== null) {
+                writeLog(34); // SetCohort
+                bot_message($chat_id, $rlm . "✅ הקבוצה שלך עודכנה ל: " . $rlm . $name);
+                // Continue: serve a question from the (possibly new) pool.
+                showNextQ();
+            } else {
+                bot_message($chat_id, $rlm . "הקבוצה אינה זמינה. אנא בחר קבוצה מהרשימה:");
+                showCohortPicker($chat_id, true);
+            }
+        } break;
+
+        case 'menu_group': {
+            writeLog(35); // MenuChangeGroup
+            showCohortPicker($chat_id, false);
         } break;
 
 

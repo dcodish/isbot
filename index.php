@@ -38,6 +38,17 @@ if ($num > 0) {
         mysqli_close($db);
         exit;
     }
+
+    // Cohort onboarding gate: after nickname, require a group selection.
+    // Text path only — callbacks are gated in variable_setup.php. No-op while
+    // settings.cohort_gate_enabled is off, and a no-op for any user who already
+    // has a cohort (i.e. every existing user), so they are never blocked.
+    if ($text !== 'callback' && !checkCohortRequired($user_id, $chat_id)) {
+        http_response_code(200);
+        echo 'OK';
+        mysqli_close($db);
+        exit;
+    }
 }
 // If user doesn't exist yet, they'll be created in /start command
 // and will be asked for nickname on next interaction
@@ -88,6 +99,12 @@ switch ($text) {
     case '/תפריט': {
         writeLog(19); // MenuCommand
         showMainMenu($chat_id);
+    } break;
+
+    case '/group':
+    case '/קבוצה': {
+        writeLog(35); // MenuChangeGroup
+        showCohortPicker($chat_id, false);
     } break;
 
     case '/stats' : {

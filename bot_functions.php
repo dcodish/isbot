@@ -92,6 +92,9 @@ function showMainMenu($chat_id) {
         array(
             array('text' => '🏆 טבלאות מובילים', 'callback_data' => 'menu_leaderboard'),
         ),
+        array(
+            array('text' => '🔀 החלף קבוצה', 'callback_data' => 'menu_group'),
+        ),
     );
 
     $markup = array('inline_keyboard' => $keyboard);
@@ -370,6 +373,120 @@ function getCurrentWeek($user_id = null) {
     }
     if ($safe_uid > 0) $userCache[$safe_uid] = $globalCache;
     return $globalCache;
+}
+
+/* ───────────────────────── Cohorts (groups) ─────────────────────────────
+ * Per-cohort "week of progress" + mandatory group onboarding. See
+ * docs/features/cohorts.md. The onboarding gate is OFF until the
+ * settings.cohort_gate_enabled flag is set to 1 (kill switch).
+ */
+
+/**
+ * Whether the mandatory cohort-onboarding gate is active.
+ * Reads settings.cohort_gate_enabled (default 0 = off). Cached per request.
+ */
+function cohortGateEnabled() {
+    global $db;
+    static $cached = null;
+    if ($cached !== null) return $cached;
+    $res = mysqli_query($db, "SELECT setting_value FROM settings WHERE setting_key = 'cohort_gate_enabled' LIMIT 1");
+    if ($res && mysqli_num_rows($res) > 0) {
+        $row = mysqli_fetch_assoc($res);
+        mysqli_free_result($res);
+        $cached = (intval($row['setting_value']) === 1);
+    } else {
+        if ($res) mysqli_free_result($res);
+        $cached = false;
+    }
+    return $cached;
+}
+
+/**
+ * Returns the user's cohort_id (int) or null if unassigned / unknown user.
+ */
+function getUserCohortId($user_id) {
+    global $db;
+    $uid = intval($user_id);
+    if ($uid <= 0) return null;
+    $res = mysqli_query($db, "SELECT cohort_id FROM users WHERE id = $uid LIMIT 1");
+    if ($res && mysqli_num_rows($res) > 0) {
+        $row = mysqli_fetch_assoc($res);
+        mysqli_free_result($res);
+        return ($row['cohort_id'] === null) ? null : intval($row['cohort_id']);
+    }
+    if ($res) mysqli_free_result($res);
+    return null;
+}
+
+/**
+ * Renders the cohort picker as an inline keyboard of ACTIVE cohorts only.
+ * $onboarding tweaks the header (first-time vs. change-group).
+ */
+function showCohortPicker($chat_id, $onboarding = false) {
+    global $db, $user_id;
+    $rlm = "\u{200F}";
+
+    $current = getUserCohortId($user_id);
+
+    $res = mysqli_query($db, "SELECT id, name FROM cohorts WHERE active = 1 ORDER BY id ASC");
+    $keyboard = [];
+    if ($res) {
+        while ($row = mysqli_fetch_assoc($res)) {
+            $cid = intval($row['id']);
+            $label = $row['name'];
+            if ($cid === $current) $label = "✅ " . $label;
+            // RLM prefix so names starting with digits ("2026 …") keep RTL order.
+            $keyboard[] = [['text' => $rlm . $label, 'callback_data' => 'setgroup:' . $cid]];
+        }
+        mysqli_free_result($res);
+    }
+
+    if (empty($keyboard)) {
+        // No active cohorts to offer — don't hard-block the user; let admin fix it.
+        bot_message($chat_id, $rlm . "אין כרגע קבוצות זמינות. אנא נסה שוב מאוחר יותר.");
+        return;
+    }
+
+    $msg = $onboarding
+        ? $rlm . "כדי להתחיל, בחר את הקבוצה שלך מהרשימה:"
+        : $rlm . "בחר את הקבוצה שלך:";
+    bot_message($chat_id, $msg, ['inline_keyboard' => $keyboard]);
+}
+
+/**
+ * Assigns the user to a cohort, but ONLY if it exists and is active. This is
+ * what stops a student manually joining an inactive cohort (e.g. the hidden
+ * admin/staff group). Returns the cohort name on success, null on failure.
+ */
+function setUserCohort($user_id, $cohort_id) {
+    global $db;
+    $uid = intval($user_id);
+    $cid = intval($cohort_id);
+    if ($uid <= 0 || $cid <= 0) return null;
+
+    $res = mysqli_query($db, "SELECT name FROM cohorts WHERE id = $cid AND active = 1 LIMIT 1");
+    if (!$res || mysqli_num_rows($res) === 0) {
+        if ($res) mysqli_free_result($res);
+        return null;
+    }
+    $row = mysqli_fetch_assoc($res);
+    $name = $row['name'];
+    mysqli_free_result($res);
+
+    mysqli_query($db, "UPDATE users SET cohort_id = $cid WHERE id = $uid");
+    return $name;
+}
+
+/**
+ * Mandatory cohort gate (mirrors checkNicknameRequired). Returns true if the
+ * user may proceed, false if they were just shown the picker and must choose.
+ * No-op (always true) while the cohort_gate_enabled flag is off.
+ */
+function checkCohortRequired($user_id, $chat_id) {
+    if (!cohortGateEnabled()) return true;
+    if (getUserCohortId($user_id) !== null) return true;
+    showCohortPicker($chat_id, true);
+    return false;
 }
 
 /**
@@ -1543,10 +1660,16 @@ function handleNicknameInput($user_id, $chat_id, $text) {
     $result = updateNickname($user_id, $proposed_nickname);
 
     if ($result['success']) {
+        // Onboarding: if the cohort gate is on and the user hasn't a group yet,
+        // ask for the group next instead of promising a question.
+        $needCohort = (cohortGateEnabled() && getUserCohortId($user_id) === null);
+
         // Success!
         $message = "✅ הכינוי נקבע בהצלחה!\n\n";
         $message .= "הכינוי שלך: `$proposed_nickname`\n\n";
-        $message .= "בוא נתחיל! הנה השאלה הראשונה שלך:";
+        if (!$needCohort) {
+            $message .= "בוא נתחיל! הנה השאלה הראשונה שלך:";
+        }
         bot_message($chat_id, $message);
         writeLog(14, 0); // Log nickname set action
 
@@ -1554,8 +1677,13 @@ function handleNicknameInput($user_id, $chat_id, $text) {
         $badgeService = new BadgeService($db, $user_id, $chat_id);
         $badgeService->checkWelcomeBadge();
 
-        // Immediately serve the first question so the user knows what to do
-        showNextQ();
+        if ($needCohort) {
+            // Force group selection before the first question.
+            showCohortPicker($chat_id, true);
+        } else {
+            // Immediately serve the first question so the user knows what to do
+            showNextQ();
+        }
     } else {
         // Error handling
         if ($result['error'] == 'invalid_format') {
