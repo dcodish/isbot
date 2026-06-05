@@ -95,8 +95,8 @@ Ordered roughly by priority / dependency. Items that were blocked on lecture fil
 ### 1. Telegram Admin Command: `/setweek N`
 Let the professor update `settings.current_week` from Telegram without opening the admin panel. Check admin user in `variable_setup.php`; validate 1–12.
 
-### 2. Week Auto-Advance
-Store `semester_start_date` in `settings`. Bot computes `current_week = FLOOR(DATEDIFF(NOW(), start_date) / 7) + 1`. Hands-off operation once the semester starts.
+### 2. ~~Week Auto-Advance~~ — rejected
+**Won't do.** See [Rejected](#rejected--wont-do) below. Week advancement stays a manual, per-semester admin action by design.
 
 ### 3. max_lecture in Admin Add/Edit Forms
 The admin panel shows a `שיעור` column and lets you filter by it, but the Add/Edit modals don't include a field for it. Authors have to use the question-writer agent or SQL to set/change `max_lecture`. Fill in the modal fields.
@@ -173,7 +173,7 @@ Delivery options:
 Needs design pass first — decide on delivery channel, wireframe the layout, pick the 5–7 most useful widgets before building. Replaces the current `/stat` and `/level` commands' narrow views.
 
 ### 9. Student Unlock Code
-Professor shares a weekly code in class; students enter it to unlock that week's questions. Alternative to auto-advance. Adds `users.student_week` + code in `settings`.
+Professor shares a weekly code in class; students enter it to unlock that week's questions. A pull-based alternative to manual week advancement. Adds `users.student_week` + code in `settings`.
 
 ### 10. CSRF Protection in Admin Panel
 Add CSRF token to session, validate on every POST to `admin/backend/save.php`.
@@ -192,9 +192,15 @@ A landing page for the professor at `/admin/` that surfaces the state of the sys
 - **Student progress snapshot**: distribution of students across levels 1–4, average `current_run`, leaderboard top-10 preview
 - **Badge distribution**: earned counts per badge type (which are chased, which are dormant)
 - **Research audit**: recent log entries (last 50 rows from the `log` table with action names), CSV export link for the full log + point_log for research
-- **Settings summary**: current_week, session_gap_minutes, semester_start (if added), with links to the unified settings page (#3a)
+- **Settings summary**: current_week, session_gap_minutes, with links to the unified settings page (#3a)
 - Primary widgets link to their detail pages (e.g. coverage report, question list filtered by lecture, leaderboard detail).
 Eventually this becomes the default admin landing — the existing questions-CRUD moves behind a "Manage Questions" link.
+
+---
+
+## Rejected / Won't Do
+
+- **Week Auto-Advance** (was #2) — computing a cohort's `current_week` automatically from `semester_start_date` (`FLOOR(DATEDIFF(NOW(), start_date)/7)+1`). **Rejected to preserve flexibility:** the professor needs to hold, skip, or roll back a semester's week to match how a class is actually pacing (holidays, makeup weeks, a lecture that ran long). An automatic clock would override that judgement. Week advancement stays a deliberate per-semester admin action in `admin/cohorts.php`. The `cohorts.semester_start_date` column already exists and is harmless — it is left in place as informational metadata, **not** wired to any auto-advance logic. The manual alternative #9 (Student Unlock Code) remains open if a pull-based model is ever wanted.
 
 ---
 

@@ -10,30 +10,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 
 include 'backend/database.php';
 
-// Handle current_week update
-$settings_message = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['current_week'])) {
-    $new_week = intval($_POST['current_week']);
-    if ($new_week >= 1 && $new_week <= 12) {
-        $stmt = mysqli_prepare($conn, "INSERT INTO settings (setting_key, setting_value) VALUES ('current_week', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
-        $week_str = (string)$new_week;
-        mysqli_stmt_bind_param($stmt, 's', $week_str);
-        mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
-        $settings_message = "Current week updated to $new_week";
-    } else {
-        $settings_message = "Invalid week: must be 1-12";
-    }
-}
-
-// Read current week
-$current_week = 12;
-$wres = mysqli_query($conn, "SELECT setting_value FROM settings WHERE setting_key = 'current_week' LIMIT 1");
-if ($wres && mysqli_num_rows($wres) > 0) {
-    $wrow = mysqli_fetch_assoc($wres);
-    $current_week = intval($wrow['setting_value']);
-    mysqli_free_result($wres);
-}
+// The global default-week control now lives on the admin home page (home.php).
 
 // Parse lecture filter from GET
 $lecture_filter_raw = isset($_GET['lecture']) ? $_GET['lecture'] : 'all';
@@ -85,21 +62,6 @@ if ($ccres) {
             <a href="stats.php" class="btn btn-default btn-sm">לוח נתונים</a>
             <a href="cohorts.php" class="btn btn-default btn-sm">ניהול סמסטרים</a>
         </nav>
-
-        <div class="panel panel-default" style="margin-top: 20px;">
-            <div class="panel-heading"><strong>Current Week</strong> (controls which lectures' questions are visible to students)</div>
-            <div class="panel-body">
-                <?php if ($settings_message): ?>
-                    <div class="alert alert-info"><?php echo htmlspecialchars($settings_message); ?></div>
-                <?php endif; ?>
-                <form method="POST" class="form-inline">
-                    <label>Current week:</label>
-                    <input type="number" name="current_week" min="1" max="12" value="<?php echo $current_week; ?>" class="form-control" style="width: 80px;">
-                    <button type="submit" class="btn btn-primary">Update</button>
-                    <span class="text-muted" style="margin-right: 10px;">Students see questions with max_lecture ≤ this value. Range: 1–12.</span>
-                </form>
-            </div>
-        </div>
 
         <div class="table-wrapper">
             <div class="table-title">

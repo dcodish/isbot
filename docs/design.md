@@ -81,5 +81,8 @@ ROADMAP #3a (FR-ADM-4).
 - **Per-cohort leaderboard scoping (leagues).** Deferred — no teams/competitions
   yet, and names are largely anonymous. Only a colour indicator is proposed
   (FR-LB-3). Revisit if the user base grows past ~50 (ROADMAP "Leagues").
-- **Week auto-advance.** Compute a cohort's week from `semester_start_date`
-  rather than manual updates (ROADMAP #2). Schema leaves room; not in v1.
+- **Week auto-advance.** *Rejected* (ROADMAP "Rejected / Won't Do"). Computing a
+  cohort's week from `semester_start_date` would override the professor's ability
+  to hold/skip/roll back a week to match real class pacing. Week advancement stays
+  a manual admin action. The `semester_start_date` column is kept as informational
+  metadata only, not wired to any auto-advance logic.

@@ -51,10 +51,11 @@ Badges awarded for streaks, milestones, level-ups, time-of-day, consistency, and
 
 ### Settings & Tunable Parameters
 The `settings` table (`setting_key VARCHAR(64) PRIMARY KEY, setting_value VARCHAR(255), updated_at TIMESTAMP`) is the central key/value store for runtime-tunable behaviour. Current keys:
-- `current_week` (1–12) — the lecture filter gate; students see questions with `max_lecture ≤ current_week`
+- `current_week` (1–12) — the **global default** lecture-filter gate, used only as a fallback for users with no `cohort_id`; cohort-assigned users resolve their week from `cohorts.current_week` instead (see Cohorts). Students see questions with `max_lecture ≤ week`
 - `session_gap_minutes` (integer) — inactivity threshold before a new session begins and previous-session questions are wiped (default 30)
+- `cohort_gate_enabled` (0/1) — when 1, new users must pick a semester after setting a nickname
 
-Readers: `getCurrentWeek()` / `getSessionGapMinutes()` in `bot_functions.php`, each caches the value statically within one request. Writers: `admin/index.php` exposes a form for `current_week`; other keys are still SQL-only until the unified settings admin page ships (roadmap #3a).
+Readers: `getCurrentWeek()` / `getSessionGapMinutes()` in `bot_functions.php`, each caches the value statically within one request. Writers: `admin/cohorts.php` (ניהול סמסטרים) writes per-cohort weeks plus the global fallback `current_week` and the `cohort_gate_enabled` toggle; `admin/home.php` is a read-only dashboard that surfaces active semesters and their weeks. Other keys are still SQL-only until the unified settings admin page ships (roadmap #3a).
 
 ### Session Management & Content-Theft Mitigation
 Every question message sent to a user (stem + "what's the correct answer?" prompt) is logged to `session_question_messages` with its `message_id`. On every interaction, `maybeStartNewSession()` in `bot_functions.php` checks `users.last_interaction_at` against `settings.session_gap_minutes`. If the gap is exceeded, uncleaned rows for that user are cleaned via `deleteMessage` (for messages ≤ 48h old) or `editMessageText` to "שאלה זו הוסרה" as fallback. The current interaction then proceeds; `last_interaction_at` is updated to `NOW()`.

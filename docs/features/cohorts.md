@@ -1,8 +1,9 @@
 # Feature Spec — Cohorts / Groups
 
-**Status:** Phases 0–4 LIVE (gate ON, `cohort_gate_enabled = 1`) + central admin
-hub & gate toggle (Phase 6 mostly done); Phase 5 (leaderboard colour) optional,
-remaining Phase 6 cleanup pending · **Created:** 2026-06-05 · **Deployed:** 2026-06-05
+**Status:** Phases 0–4 + 6 LIVE (gate ON, `cohort_gate_enabled = 1`). Admin
+dashboard (`home.php`) consolidates global-week + gate toggle + stats; legacy
+week form retired. Phase 5 (leaderboard colour) optional/not built · **Created:**
+2026-06-05 · **Deployed:** 2026-06-05 · **Admin cleanup:** 2026-06-06
 
 **Terminology:** user-facing term is **סמסטר** (semester), not "קבוצה". The DB
 table / admin page remain "cohorts / קבוצות" (internal). The picker shows a
@@ -80,7 +81,7 @@ CREATE TABLE IF NOT EXISTS cohorts (
     current_week  TINYINT NOT NULL DEFAULT 12,   -- 1..12, same semantics as settings.current_week
     color         VARCHAR(16) NULL,              -- optional leaderboard indicator
     active        TINYINT(1) NOT NULL DEFAULT 1, -- inactive cohorts hidden from the picker
-    semester_start_date DATE NULL,               -- reserved for week auto-advance (ROADMAP #2)
+    semester_start_date DATE NULL,               -- informational metadata only; auto-advance rejected (see ROADMAP)
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
@@ -255,16 +256,20 @@ new user sets their nickname. Behind `settings.cohort_gate_enabled` (=0). Flip t
 ### Phase 5 — Optional leaderboard colour indicator (FR-COH-6)
 - Only if cheap; mind RTL/RLM on rows. Skippable.
 
-### Phase 6 — Central admin hub + cleanup ✅ MOSTLY DONE 2026-06-05
-- `admin/home.php`: central hub (quick stats + cards → Questions / Cohorts /
-  Stats). `login.php` now lands here; `index.php` stays the questions page
-  (bookmarks unaffected). Nav links added across all admin pages. (FR-COH-7) ✅
-- Gate on/off toggle added to `admin/cohorts.php` (writes
-  `settings.cohort_gate_enabled`) — professor controls the gate without SQL. ✅
-- Still pending: retire the legacy global-week form in `index.php` (kept for now
-  as the documented fallback); fold design into `ARCHITECTURE.md`; flip SRS
-  requirements to **built**; mark "Leagues (cohorts)" partially delivered in
-  `ROADMAP.md`.
+### Phase 6 — Central admin dashboard + cleanup ✅ DONE 2026-06-06
+- `admin/home.php` is the admin **dashboard**: read-only quick stats + a table of
+  **active semesters and their current week** (+ user counts), plus cards →
+  Questions / Semesters / Stats. `login.php` lands here; `index.php` stays the
+  questions page (bookmarks unaffected). Nav consistent across pages. (FR-COH-7) ✅
+- **Legacy global-week form retired** from `index.php`. ✅
+- All week/gate **controls consolidated on `admin/cohorts.php`** (ניהול סמסטרים):
+  per-cohort weeks, the onboarding **gate toggle**, and the **global fallback
+  week** (used only for users with no `cohort_id`). The dashboard intentionally
+  shows status only — no global-default-week or gate widgets. ✅
+- `ARCHITECTURE.md` settings section updated (writers + global-week-as-fallback). ✅
+- Still pending: fold the full cohort design into `ARCHITECTURE.md`; flip the SRS
+  requirements (FR-COH-*, FR-ADM-4/5, FR-LB-3) to **built**; mark "Leagues
+  (cohorts)" partially delivered in `ROADMAP.md`.
 
 ### What could still harm existing users — and why it won't
 | Risk | Mitigation |
@@ -290,8 +295,10 @@ new user sets their nickname. Behind `settings.cohort_gate_enabled` (=0). Flip t
 
 - **Default cohort Hebrew name** — DECIDED: `סמסטר א 2026` (all existing users
   are backfilled into it; renameable later in the admin UI).
-- **Week auto-advance** (ROADMAP #2) — deferred; `semester_start_date` column
-  left in place so it needs no further migration.
+- **Week auto-advance** — **rejected** (see ROADMAP "Rejected / Won't Do").
+  Week advancement stays a manual per-semester admin action to preserve pacing
+  flexibility. The `semester_start_date` column is kept as informational metadata
+  only and is not wired to any auto-advance logic.
 
 ## 7. Traceability
 

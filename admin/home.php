@@ -22,11 +22,25 @@ function scalar($conn, $sql, $default = 0) {
     return $default;
 }
 
-$total_users    = scalar($conn, "SELECT COUNT(*) FROM users");
+$total_users     = scalar($conn, "SELECT COUNT(*) FROM users");
 $total_questions = scalar($conn, "SELECT COUNT(*) FROM questions");
-$active_cohorts = scalar($conn, "SELECT COUNT(*) FROM cohorts WHERE active = 1");
-$global_week    = scalar($conn, "SELECT setting_value FROM settings WHERE setting_key='current_week'", '—');
-$gate_enabled   = (intval(scalar($conn, "SELECT setting_value FROM settings WHERE setting_key='cohort_gate_enabled'", 0)) === 1);
+$active_cohorts  = scalar($conn, "SELECT COUNT(*) FROM cohorts WHERE active = 1");
+
+// Colour swatches for the (optional) per-semester indicator.
+$COLOR_SWATCH = ['red' => '#e53935', 'blue' => '#1e88e5', 'green' => '#43a047', 'orange' => '#fb8c00', 'purple' => '#8e24aa'];
+
+// ── Active semesters with their current week + user counts ───────────────────
+$cohorts = [];
+$res = mysqli_query($conn,
+    "SELECT c.id, c.name, c.current_week, c.color,
+            (SELECT COUNT(*) FROM users u WHERE u.cohort_id = c.id) AS user_count
+       FROM cohorts c
+      WHERE c.active = 1
+   ORDER BY c.id ASC");
+if ($res) {
+    while ($row = mysqli_fetch_assoc($res)) $cohorts[] = $row;
+    mysqli_free_result($res);
+}
 ?>
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
@@ -48,6 +62,9 @@ $gate_enabled   = (intval(scalar($conn, "SELECT setting_value FROM settings WHER
                 background:#fff; border:1px solid #e3e3e3; border-radius:8px; text-align:center; }
         .stat .num { font-size:24px; font-weight:bold; color:#435d7d; }
         .stat .lbl { color:#999; font-size:12px; }
+        .swatch { display:inline-block; width:14px; height:14px; border-radius:3px; vertical-align:middle; margin-left:6px; border:1px solid #ccc; }
+        .num { font-variant-numeric: tabular-nums; }
+        .wk { font-size:20px; font-weight:bold; color:#435d7d; }
     </style>
 </head>
 <body>
@@ -63,10 +80,43 @@ $gate_enabled   = (intval(scalar($conn, "SELECT setting_value FROM settings WHER
         <div class="stat"><div class="num"><?php echo intval($total_users); ?></div><div class="lbl">משתמשים</div></div>
         <div class="stat"><div class="num"><?php echo intval($total_questions); ?></div><div class="lbl">שאלות</div></div>
         <div class="stat"><div class="num"><?php echo intval($active_cohorts); ?></div><div class="lbl">סמסטרים פעילים</div></div>
-        <div class="stat"><div class="num"><?php echo htmlspecialchars($global_week); ?></div><div class="lbl">שבוע גלובלי (ברירת מחדל)</div></div>
-        <div class="stat">
-            <div class="num"><?php echo $gate_enabled ? 'מופעל' : 'כבוי'; ?></div>
-            <div class="lbl">שער בחירת סמסטר</div>
+    </div>
+
+    <!-- active semesters + their week -->
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>סמסטרים פעילים והשבוע הנוכחי שלהם</strong>
+            <a href="cohorts.php" class="btn btn-primary btn-xs pull-left">ניהול סמסטרים</a>
+        </div>
+        <div class="panel-body">
+            <?php if (!$cohorts): ?>
+                <p class="text-muted">אין סמסטרים פעילים. <a href="cohorts.php">צור סמסטר</a>.</p>
+            <?php else: ?>
+            <table class="table table-striped" style="margin-bottom:0;">
+                <thead>
+                    <tr>
+                        <th>שם הסמסטר</th>
+                        <th>שבוע נוכחי</th>
+                        <th>סטודנטים</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($cohorts as $c): ?>
+                    <tr>
+                        <td>
+                            <?php $cur = $c['color'] ?? ''; ?>
+                            <?php if ($cur && isset($COLOR_SWATCH[$cur])): ?>
+                                <span class="swatch" style="background:<?php echo $COLOR_SWATCH[$cur]; ?>"></span>
+                            <?php endif; ?>
+                            <?php echo htmlspecialchars($c['name']); ?>
+                        </td>
+                        <td><span class="wk">שבוע <?php echo intval($c['current_week']); ?></span></td>
+                        <td class="num"><?php echo intval($c['user_count']); ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -76,14 +126,14 @@ $gate_enabled   = (intval(scalar($conn, "SELECT setting_value FROM settings WHER
             <a class="hub-card" href="index.php">
                 <div class="icon">📝</div>
                 <h3>ניהול שאלות</h3>
-                <p>הוספה, עריכה וסינון שאלות; שאלות שדווחו; שבוע גלובלי.</p>
+                <p>הוספה, עריכה וסינון שאלות; שאלות שדווחו.</p>
             </a>
         </div>
         <div class="col-sm-4">
             <a class="hub-card" href="cohorts.php">
                 <div class="icon">👥</div>
                 <h3>ניהול סמסטרים</h3>
-                <p>יצירה ועריכה של סמסטרים, שבוע לכל סמסטר, ושער ההצטרפות.</p>
+                <p>יצירה ועריכה של סמסטרים, ושבוע נפרד לכל סמסטר.</p>
             </a>
         </div>
         <div class="col-sm-4">

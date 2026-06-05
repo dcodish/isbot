@@ -17,6 +17,19 @@ $COLOR_SWATCH   = ['red' => '#e53935', 'blue' => '#1e88e5', 'green' => '#43a047'
 $message = '';
 $message_type = 'info';
 
+// Read a single settings value by key.
+function scalar_setting($conn, $key, $default = null) {
+    $k = mysqli_real_escape_string($conn, $key);
+    $res = mysqli_query($conn, "SELECT setting_value FROM settings WHERE setting_key='$k' LIMIT 1");
+    if ($res && mysqli_num_rows($res) > 0) {
+        $row = mysqli_fetch_assoc($res);
+        mysqli_free_result($res);
+        return $row['setting_value'];
+    }
+    if ($res) mysqli_free_result($res);
+    return $default;
+}
+
 // ── POST router ────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = isset($_POST['action']) ? $_POST['action'] : '';
@@ -83,17 +96,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ? 'שער בחירת הסמסטר הופעל — משתמשים חדשים יחויבו לבחור סמסטר אחרי קביעת כינוי.'
             : 'שער בחירת הסמסטר כובה — משתמשים חדשים לא יתבקשו לבחור סמסטר.';
         $message_type = 'success';
+    } elseif ($action === 'set_week') {
+        $new_week = intval($_POST['current_week'] ?? 0);
+        if ($new_week >= 1 && $new_week <= 12) {
+            $stmt = mysqli_prepare($conn,
+                "INSERT INTO settings (setting_key, setting_value) VALUES ('current_week', ?)
+                 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+            $week_str = (string)$new_week;
+            mysqli_stmt_bind_param($stmt, 's', $week_str);
+            mysqli_stmt_execute($stmt);
+            mysqli_stmt_close($stmt);
+            $message = "שבוע ברירת המחדל הגלובלי עודכן ל-$new_week."; $message_type = 'success';
+        } else {
+            $message = 'שבוע לא תקין: חייב להיות בטווח 1–12.'; $message_type = 'danger';
+        }
     }
 }
 
-// Read the onboarding-gate flag (settings.cohort_gate_enabled).
-$gate_enabled = false;
-$gres = mysqli_query($conn, "SELECT setting_value FROM settings WHERE setting_key='cohort_gate_enabled' LIMIT 1");
-if ($gres && mysqli_num_rows($gres) > 0) {
-    $grow = mysqli_fetch_assoc($gres);
-    $gate_enabled = (intval($grow['setting_value']) === 1);
-    mysqli_free_result($gres);
-}
+// Onboarding-gate flag (settings.cohort_gate_enabled) + global fallback week.
+$gate_enabled = (intval(scalar_setting($conn, 'cohort_gate_enabled', 0)) === 1);
+$global_week  = intval(scalar_setting($conn, 'current_week', 12));
+$fallback_users = 0;
+$fres = mysqli_query($conn, "SELECT COUNT(*) AS n FROM users WHERE cohort_id IS NULL");
+if ($fres) { $fallback_users = intval(mysqli_fetch_assoc($fres)['n']); mysqli_free_result($fres); }
 
 // ── Load cohorts with user counts ────────────────────────────────────────────
 $cohorts = [];
@@ -169,6 +194,25 @@ foreach ($cohorts as $c) $total_assigned += intval($c['user_count']);
             <span class="text-muted" style="margin-right:10px;">
                 משתמשים קיימים לעולם אינם מושפעים — כולם כבר משויכים לסמסטר. זהו מתג כיבוי מיידי.
             </span>
+        </div>
+    </div>
+
+    <!-- Global fallback week (for users with no semester) -->
+    <div class="panel panel-default">
+        <div class="panel-heading"><strong>שבוע ברירת מחדל גלובלי (גיבוי)</strong></div>
+        <div class="panel-body">
+            <form method="POST" class="form-inline">
+                <input type="hidden" name="action" value="set_week">
+                <label>שבוע:</label>
+                <input type="number" name="current_week" min="1" max="12"
+                       value="<?php echo intval($global_week); ?>"
+                       class="form-control" style="width:80px;">
+                <button type="submit" class="btn btn-primary">עדכון</button>
+            </form>
+            <p class="text-muted small" style="margin-top:10px;">
+                משמש רק לסטודנטים שאינם משויכים לסמסטר (<?php echo $fallback_users; ?> כרגע).
+                סטודנט המשויך לסמסטר רואה שאלות לפי שבוע הסמסטר שלו (בטבלה למטה). טווח 1–12.
+            </p>
         </div>
     </div>
 
