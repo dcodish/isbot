@@ -1,7 +1,8 @@
 # Feature Spec — Cohorts / Groups
 
-**Status:** Phases 0–4 LIVE (gate ON, `cohort_gate_enabled = 1`); Phases 5–6
-pending · **Created:** 2026-06-05 · **Deployed:** 2026-06-05
+**Status:** Phases 0–4 LIVE (gate ON, `cohort_gate_enabled = 1`) + central admin
+hub & gate toggle (Phase 6 mostly done); Phase 5 (leaderboard colour) optional,
+remaining Phase 6 cleanup pending · **Created:** 2026-06-05 · **Deployed:** 2026-06-05
 
 **Terminology:** user-facing term is **סמסטר** (semester), not "קבוצה". The DB
 table / admin page remain "cohorts / קבוצות" (internal). The picker shows a
@@ -246,12 +247,16 @@ new user sets their nickname. Behind `settings.cohort_gate_enabled` (=0). Flip t
 ### Phase 5 — Optional leaderboard colour indicator (FR-COH-6)
 - Only if cheap; mind RTL/RLM on rows. Skippable.
 
-### Phase 6 — Central admin hub + cleanup (after everything proven)
-- Central hub linking Questions / Stats / Cohorts (FR-COH-7). Move question-CRUD
-  behind a link.
-- Retire the legacy global-week form (now redundant).
-- Fold design into `ARCHITECTURE.md`; flip these requirements to **built** in the
-  SRS; mark "Leagues (cohorts)" partially delivered in `ROADMAP.md`.
+### Phase 6 — Central admin hub + cleanup ✅ MOSTLY DONE 2026-06-05
+- `admin/home.php`: central hub (quick stats + cards → Questions / Cohorts /
+  Stats). `login.php` now lands here; `index.php` stays the questions page
+  (bookmarks unaffected). Nav links added across all admin pages. (FR-COH-7) ✅
+- Gate on/off toggle added to `admin/cohorts.php` (writes
+  `settings.cohort_gate_enabled`) — professor controls the gate without SQL. ✅
+- Still pending: retire the legacy global-week form in `index.php` (kept for now
+  as the documented fallback); fold design into `ARCHITECTURE.md`; flip SRS
+  requirements to **built**; mark "Leagues (cohorts)" partially delivered in
+  `ROADMAP.md`.
 
 ### What could still harm existing users — and why it won't
 | Risk | Mitigation |

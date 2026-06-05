@@ -17,7 +17,7 @@ if (isset($_POST['submit'])) {
 
     if ($username === $valid_username && $password === $valid_password) {
         $_SESSION['loggedin'] = true;
-        header('Location: index.php');
+        header('Location: home.php');
         exit();
     } else {
         $error = "Invalid username or password";

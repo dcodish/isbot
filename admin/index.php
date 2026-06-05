@@ -80,9 +80,10 @@ if ($ccres) {
 	<p id="success"></p>
 
         <nav style="margin-top:18px; margin-bottom:10px;">
+            <a href="home.php" class="btn btn-default btn-sm">🏠 ראשי</a>
             <a href="index.php" class="btn btn-primary btn-sm">ניהול שאלות</a>
             <a href="stats.php" class="btn btn-default btn-sm">לוח נתונים</a>
-            <a href="cohorts.php" class="btn btn-default btn-sm">ניהול קבוצות</a>
+            <a href="cohorts.php" class="btn btn-default btn-sm">ניהול סמסטרים</a>
         </nav>
 
         <div class="panel panel-default" style="margin-top: 20px;">
