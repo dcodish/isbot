@@ -275,6 +275,17 @@ if (isset($update['callback_query'])) {
             }
         } break;
 
+        case 'pickgroup': {
+            // Change flow: a semester was tapped — confirm before switching.
+            $cid = intval($pieces[1] ?? 0);
+            showCohortConfirm($chat_id, $cid);
+        } break;
+
+        case 'cancel_group': {
+            $rlm = "\u{200F}";
+            bot_message($chat_id, $rlm . "הפעולה בוטלה. נשארת בסמסטר הנוכחי.");
+        } break;
+
         case 'menu_group': {
             writeLog(35); // MenuChangeGroup
             showCohortPicker($chat_id, false);

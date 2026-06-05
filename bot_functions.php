@@ -92,9 +92,6 @@ function showMainMenu($chat_id) {
         array(
             array('text' => '🏆 טבלאות מובילים', 'callback_data' => 'menu_leaderboard'),
         ),
-        array(
-            array('text' => '🔀 החלף סמסטר', 'callback_data' => 'menu_group'),
-        ),
     );
 
     $markup = array('inline_keyboard' => $keyboard);
@@ -435,8 +432,11 @@ function showCohortPicker($chat_id, $onboarding = false) {
             $cid = intval($row['id']);
             $label = $row['name'];
             if ($cid === $current) $label = "✅ " . $label;
+            // Onboarding sets directly (nothing to lose, minimise friction); the
+            // change flow goes through a confirm step to prevent accidental taps.
+            $cb = $onboarding ? ('setgroup:' . $cid) : ('pickgroup:' . $cid);
             // RLM prefix so names starting with digits ("2026 …") keep RTL order.
-            $keyboard[] = [['text' => $rlm . $label, 'callback_data' => 'setgroup:' . $cid]];
+            $keyboard[] = [['text' => $rlm . $label, 'callback_data' => $cb]];
         }
         mysqli_free_result($res);
     }
@@ -455,6 +455,36 @@ function showCohortPicker($chat_id, $onboarding = false) {
         ? $rlm . "כדי להתחיל, בחר את הסמסטר שלך:\n\n" . $warn
         : $rlm . "בחר את הסמסטר שלך:\n\n" . $warn;
     bot_message($chat_id, $msg, ['inline_keyboard' => $keyboard]);
+}
+
+/**
+ * Confirmation step before switching semester (change flow only). Shows the
+ * target semester and asks the user to confirm, so a single accidental tap
+ * can't move them. Confirm → setgroup:<id>; cancel → cancel_group.
+ */
+function showCohortConfirm($chat_id, $cohort_id) {
+    global $db;
+    $cid = intval($cohort_id);
+    $rlm = "\u{200F}";
+
+    $res = mysqli_query($db, "SELECT name FROM cohorts WHERE id = $cid AND active = 1 LIMIT 1");
+    if (!$res || mysqli_num_rows($res) === 0) {
+        if ($res) mysqli_free_result($res);
+        bot_message($chat_id, $rlm . "הסמסטר אינו זמין. אנא בחר סמסטר מהרשימה:");
+        showCohortPicker($chat_id, false);
+        return;
+    }
+    $row = mysqli_fetch_assoc($res);
+    $name = $row['name'];
+    mysqli_free_result($res);
+
+    $msg = $rlm . "אתה עומד לעבור לסמסטר: " . $rlm . $name . "\n\n"
+         . $rlm . "פעולה זו תשנה אילו שאלות תראה. להמשיך?";
+    $kb = ['inline_keyboard' => [[
+        ['text' => $rlm . "✅ כן, העבר אותי", 'callback_data' => 'setgroup:' . $cid],
+        ['text' => "❌ ביטול",               'callback_data' => 'cancel_group'],
+    ]]];
+    bot_message($chat_id, $msg, $kb);
 }
 
 /**

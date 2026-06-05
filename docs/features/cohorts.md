@@ -217,8 +217,13 @@ Legacy global-week form in `admin/index.php` intentionally kept for now (retire 
 - **Rollback:** revert admin changes; no student-facing surface touched.
 
 ### Phase 3 — User self-service group switch (OPTIONAL, no gate yet) ✅ DONE 2026-06-05
-`/group` + `/קבוצה` commands, "🔀 החלף קבוצה" menu entry, `setgroup:<id>` callback
-(rejects inactive cohorts, so students can't join צוות), `menu_group` callback.
+Self-switch is a **slash command only** (`/סמסטר`, `/group`) — the menu button was
+removed to make it less discoverable and prevent accidental taps. The change flow
+is **two-step**: tap a semester → `pickgroup:<id>` shows a confirm ("אתה עומד
+לעבור ל-X… להמשיך?") → `setgroup:<id>` (✅ אשר) commits, `cancel_group` (❌ ביטול)
+aborts. Onboarding stays a **direct** tap (`setgroup:<id>`, no confirm — nothing
+to lose on a first pick). `setUserCohort()` rejects inactive cohorts so students
+can't join צוות.
 - `/group` command + `setgroup:<id>` callback + "החלף קבוצה" menu entry. Users
   *may* switch; nobody is forced. Validate target cohort is active.
 - **Why safe:** purely additive capability; no one is blocked, default
