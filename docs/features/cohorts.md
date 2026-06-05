@@ -1,8 +1,12 @@
 # Feature Spec — Cohorts / Groups
 
-**Status:** Phases 0–3 deployed + Phase 4 deployed-dormant (gate code live,
-`cohort_gate_enabled = 0` kill switch OFF); Phases 5–6 pending ·
-**Created:** 2026-06-05 · **Deployed:** 2026-06-05
+**Status:** Phases 0–4 LIVE (gate ON, `cohort_gate_enabled = 1`); Phases 5–6
+pending · **Created:** 2026-06-05 · **Deployed:** 2026-06-05
+
+**Terminology:** user-facing term is **סמסטר** (semester), not "קבוצה". The DB
+table / admin page remain "cohorts / קבוצות" (internal). The picker shows a
+warning that selecting a semester transfers the user and should only be done for
+the semester they belong to.
 **Extends:** [../requirements.md](../requirements.md) · **Decisions:**
 [../design.md](../design.md) ADR-006/007/008
 

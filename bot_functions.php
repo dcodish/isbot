@@ -93,7 +93,7 @@ function showMainMenu($chat_id) {
             array('text' => '🏆 טבלאות מובילים', 'callback_data' => 'menu_leaderboard'),
         ),
         array(
-            array('text' => '🔀 החלף קבוצה', 'callback_data' => 'menu_group'),
+            array('text' => '🔀 החלף סמסטר', 'callback_data' => 'menu_group'),
         ),
     );
 
@@ -442,14 +442,18 @@ function showCohortPicker($chat_id, $onboarding = false) {
     }
 
     if (empty($keyboard)) {
-        // No active cohorts to offer — don't hard-block the user; let admin fix it.
-        bot_message($chat_id, $rlm . "אין כרגע קבוצות זמינות. אנא נסה שוב מאוחר יותר.");
+        // No active semesters to offer — don't hard-block the user; let admin fix it.
+        bot_message($chat_id, $rlm . "אין כרגע סמסטרים זמינים. אנא נסה שוב מאוחר יותר.");
         return;
     }
 
+    // Warning: choosing a semester moves the user into it and changes which
+    // questions they see — they should pick only the semester they belong to.
+    $warn = $rlm . "⚠️ בחירת סמסטר תעביר אותך לסמסטר הנבחר ותקבע אילו שאלות תראה. "
+                 . "בחר אך ורק את הסמסטר שאליו אתה משתייך.";
     $msg = $onboarding
-        ? $rlm . "כדי להתחיל, בחר את הקבוצה שלך מהרשימה:"
-        : $rlm . "בחר את הקבוצה שלך:";
+        ? $rlm . "כדי להתחיל, בחר את הסמסטר שלך:\n\n" . $warn
+        : $rlm . "בחר את הסמסטר שלך:\n\n" . $warn;
     bot_message($chat_id, $msg, ['inline_keyboard' => $keyboard]);
 }
 

@@ -102,7 +102,7 @@ switch ($text) {
     } break;
 
     case '/group':
-    case '/קבוצה': {
+    case '/סמסטר': {
         writeLog(35); // MenuChangeGroup
         showCohortPicker($chat_id, false);
     } break;

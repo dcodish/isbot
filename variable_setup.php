@@ -266,11 +266,11 @@ if (isset($update['callback_query'])) {
             $rlm = "\u{200F}";
             if ($name !== null) {
                 writeLog(34); // SetCohort
-                bot_message($chat_id, $rlm . "✅ הקבוצה שלך עודכנה ל: " . $rlm . $name);
+                bot_message($chat_id, $rlm . "✅ הסמסטר שלך עודכן ל: " . $rlm . $name);
                 // Continue: serve a question from the (possibly new) pool.
                 showNextQ();
             } else {
-                bot_message($chat_id, $rlm . "הקבוצה אינה זמינה. אנא בחר קבוצה מהרשימה:");
+                bot_message($chat_id, $rlm . "הסמסטר אינו זמין. אנא בחר סמסטר מהרשימה:");
                 showCohortPicker($chat_id, true);
             }
         } break;
