@@ -14,14 +14,16 @@
 require_once __DIR__ . '/../bootstrap/app.php';
 require_once __DIR__ . '/../bot_functions.php';
 
+// Mirrors the previously-curated menu, with /semester inserted. Keep existing
+// wording; only add/remove deliberately.
 $commands = [
-    ['command' => 'menu',           'description' => 'תפריט ראשי'],
+    ['command' => 'start',          'description' => 'התחל / חזור לבוט'],
+    ['command' => 'menu',           'description' => 'תפריט ראשי - לוח מובילים, תגים ועוד'],
     ['command' => 'semester',       'description' => 'בחירת או החלפת סמסטר'],
     ['command' => 'stats',          'description' => 'הסטטיסטיקות שלי'],
-    ['command' => 'level',          'description' => 'השלב וההתקדמות שלי'],
-    ['command' => 'leaderboard',    'description' => 'טבלאות המובילים'],
-    ['command' => 'changenickname', 'description' => 'שינוי כינוי'],
-    ['command' => 'clearstats',     'description' => 'איפוס היסטוריית התשובות'],
+    ['command' => 'level',          'description' => 'הרמה הנוכחית שלי'],
+    ['command' => 'changenickname', 'description' => 'שנה כינוי'],
+    ['command' => 'clearstats',     'description' => 'אפס את ההתקדמות שלי'],
 ];
 
 echo "--- existing commands (before) ---\n";
