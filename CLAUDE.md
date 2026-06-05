@@ -1,6 +1,18 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this repo. System architecture, message flow, DB schema, and feature behavior live in [ARCHITECTURE.md](ARCHITECTURE.md). Setup instructions live in [README.md](README.md). Read those first for context.
+Guidance for Claude Code when working in this repo. System architecture, message flow, DB schema, and feature behavior live in [ARCHITECTURE.md](ARCHITECTURE.md). Setup instructions live in [README.md](README.md). Requirements, design decisions, and feature specs live in [docs/](docs/). Read those first for context.
+
+## Documentation Workflow
+
+Requirements, design decisions, and roadmaps are **managed in documents** — not left in chat, commit messages, or ad-hoc drafts. Keep them current as part of the work, not as an afterthought. Where each kind of thing lives:
+
+- **Requirements** → [docs/requirements.md](docs/requirements.md) — the system-wide SRS. Numbered `FR-*` / `NFR-*`, each tagged `built` / `planned` / `proposed`.
+- **Decisions** → [docs/design.md](docs/design.md) — cross-cutting design rationale as ADRs (ADR-NNN). Record *why*, with trade-offs.
+- **Per-feature specs** → [docs/features/<feature>.md](docs/features/) — requirements + design for one feature, traced back to the SRS IDs.
+- **Architecture (as-built)** → [ARCHITECTURE.md](ARCHITECTURE.md) — *how it works now*. When a feature ships, fold its design here and flip its SRS requirements to `built`.
+- **Backlog / future ideas** → [ROADMAP.md](ROADMAP.md).
+
+Conventions and the source-of-truth split are in [docs/README.md](docs/README.md). When a planning conversation produces requirements or decisions, write them into the right doc (don't park them in `runtime/drafts/`). Requirement IDs are stable — extend, don't renumber.
 
 ## Conventions
 

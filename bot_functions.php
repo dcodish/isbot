@@ -320,25 +320,56 @@ function maybeStartNewSession($user_id, $chat_id) {
 }
 
 /**
- * Reads settings.current_week (defaults to 12 = no restriction if the row is missing).
- * Cached per request via static to avoid repeated lookups within one getQuestion() call.
+ * Resolves the current "week of progress" that gates the question pool.
+ *
+ * Per-cohort: if $user_id is given and that user belongs to a cohort, the
+ * cohort's current_week is used. Otherwise (no user, or user not assigned to a
+ * cohort) it falls back to the global settings.current_week — the original
+ * behaviour. Defaults to 12 (no restriction) if neither is available.
+ *
+ * Cached per request: per-user weeks in $userCache, the global fallback in
+ * $globalCache, to avoid repeated lookups within one getQuestion() call.
  */
-function getCurrentWeek() {
+function getCurrentWeek($user_id = null) {
     global $db;
-    static $cached = null;
-    if ($cached !== null) return $cached;
+    static $userCache = [];      // user_id => resolved week
+    static $globalCache = null;  // settings.current_week fallback
 
-    $result = mysqli_query($db, "SELECT setting_value FROM settings WHERE setting_key = 'current_week' LIMIT 1");
-    if ($result && mysqli_num_rows($result) > 0) {
-        $row = mysqli_fetch_assoc($result);
-        mysqli_free_result($result);
-        $week = intval($row['setting_value']);
-        $cached = ($week >= 1 && $week <= 12) ? $week : 12;
-    } else {
-        if ($result) mysqli_free_result($result);
-        $cached = 12;
+    $safe_uid = ($user_id === null) ? 0 : intval($user_id);
+
+    // Per-user resolution via the user's cohort.
+    if ($safe_uid > 0) {
+        if (isset($userCache[$safe_uid])) return $userCache[$safe_uid];
+        $cres = mysqli_query($db, "SELECT c.current_week
+                                     FROM users u
+                                     JOIN cohorts c ON c.id = u.cohort_id
+                                    WHERE u.id = $safe_uid LIMIT 1");
+        if ($cres && mysqli_num_rows($cres) > 0) {
+            $crow = mysqli_fetch_assoc($cres);
+            mysqli_free_result($cres);
+            $cweek = intval($crow['current_week']);
+            $userCache[$safe_uid] = ($cweek >= 1 && $cweek <= 12) ? $cweek : 12;
+            return $userCache[$safe_uid];
+        }
+        if ($cres) mysqli_free_result($cres);
+        // User has no cohort -> fall through to the global setting.
     }
-    return $cached;
+
+    // Global fallback (original behaviour, unchanged).
+    if ($globalCache === null) {
+        $result = mysqli_query($db, "SELECT setting_value FROM settings WHERE setting_key = 'current_week' LIMIT 1");
+        if ($result && mysqli_num_rows($result) > 0) {
+            $row = mysqli_fetch_assoc($result);
+            mysqli_free_result($result);
+            $week = intval($row['setting_value']);
+            $globalCache = ($week >= 1 && $week <= 12) ? $week : 12;
+        } else {
+            if ($result) mysqli_free_result($result);
+            $globalCache = 12;
+        }
+    }
+    if ($safe_uid > 0) $userCache[$safe_uid] = $globalCache;
+    return $globalCache;
 }
 
 /**
@@ -390,7 +421,8 @@ function getQuestion() {
     $safe_user_id = intval($user_id);
 
     // Restrict question pool to material taught so far. NULL max_lecture means "always visible".
-    $current_week = getCurrentWeek();
+    // Per-cohort: resolves to the user's cohort week, else the global setting.
+    $current_week = getCurrentWeek($user_id);
     $lectureFilter = "(max_lecture IS NULL OR max_lecture <= $current_week)";
 
     // Get user level
