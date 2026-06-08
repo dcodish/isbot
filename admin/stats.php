@@ -166,6 +166,7 @@ $action_labels = [
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
         <h2 style="margin:0; color:#435d7d;">📊 Usage Stats</h2>
         <div>
+            <a href="analytics.php" class="btn btn-primary btn-sm">📈 Gamification Analytics</a>
             <a href="home.php" class="btn btn-default btn-sm">🏠 ראשי</a>
             <a href="index.php" class="btn btn-default btn-sm">ניהול שאלות</a>
             <a href="cohorts.php" class="btn btn-default btn-sm">ניהול סמסטרים</a>
