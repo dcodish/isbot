@@ -30,6 +30,7 @@ Structured project documentation for the isbot quiz bot. Split by intent:
   admin analytics page measuring gamification impact on usage (event study,
   retention, funnel, reach, dead badges). **Built** 2026-06-08.
 - [features/abuse-detection.md](features/abuse-detection.md) — offline, read-only
-  detection of scraping/farming behaviour (fast-skip spam, over-regular timing,
-  marathon runs); silent, no enforcement. Phase 1 of NFR-7 / ADR-010. **Design**,
-  not built.
+  detection of scraping/farming behaviour: ranked list (`abuse.php`) + per-account
+  drill-down (`user.php`) + shared signed scoring with exculpatory signals
+  (`lib/behavior.php`). Silent, no enforcement. Phase 1 of NFR-7 / ADR-010.
+  **Built** 2026-06-08.

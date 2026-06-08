@@ -2,27 +2,11 @@
 /**
  * admin/abuse.php — Offline scraping / farming detection (read-only, silent).
  *
- * WHAT THIS PAGE IS
- *   It looks at the activity log and flags accounts that *behave* like a script
- *   rather than a human — someone harvesting the question bank or farming points.
- *   It takes NO action: it never blocks, throttles, or messages anyone. You read
- *   the flags and decide. (Spec: docs/features/abuse-detection.md; ADR-010.)
- *
- * HOW IT DECIDES (all from the `log` table — no new data is collected)
- *   The single primitive is the GAP between a user's consecutive actions. From
- *   that we derive a few human-vs-bot tells:
- *     1. Fast-skip spam   — skipping questions in under a few seconds, in volume.
- *                           Skipping reveals the question and moves on with zero
- *                           thinking — the cheapest way to harvest the bank.
- *     2. Timing regularity— a sleep()-loop is too *even*; humans are bursty. Low
- *                           variation in the gaps is the hardest tell to fake.
- *     3. Inhuman pace     — a very low typical gap between actions.
- *     4. Marathon burst   — a huge number of actions packed into a single hour.
- *   These are combined into a 0–100 "suspicion score" purely to sort the table.
- *   The raw numbers are shown next to it so YOU judge, not the score.
- *
- *   Everything is computed offline (only when you open this page). The thresholds
- *   below are starting points, tuned by eye — adjust as the real data teaches you.
+ * Ranks every active account by a 0–100 suspicion score and shows the evidence.
+ * The scoring model (which behaviours count, and how) lives in lib/behavior.php
+ * and is shared with the per-account drill-down (user.php), so the list and the
+ * profile always agree. It takes NO action: it never blocks, throttles, or
+ * messages anyone. (Spec: docs/features/abuse-detection.md; ADR-010.)
  */
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -34,127 +18,54 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 }
 
 include 'backend/database.php';
+require_once 'lib/behavior.php';
 
-// ── Tunable thresholds (page-level; promote to `settings` only if enforcement ships) ──
-$days        = isset($_GET['days']) ? max(1, min(180, intval($_GET['days']))) : 7;  // lookback window
-$FAST_SKIP   = 3;     // a skip with a preceding gap below this many seconds = "barely read it"
-$MIN_EVENTS  = 20;    // need at least this many actions in the window to judge an account at all
-$MIN_GAPS_CV = 8;     // need at least this many in-session gaps before the regularity number is trustworthy
-$SKIP        = 3;     // action_type for a regular-question Skip
-$ANSWER      = [1, 2];// action_types for answered (correct / wrong)
+$days = isset($_GET['days']) ? max(1, min(180, intval($_GET['days']))) : 7;   // lookback window
 
-// Session gap (seconds): anything longer than this is a real break, not "thinking", so it's
-// excluded from pace/regularity. Read from the same `settings` knob the bot uses.
+// Session gap (seconds) — the same `settings` knob the bot uses; longer gaps are
+// real breaks, excluded from pace/regularity.
 $gap_row = mysqli_fetch_assoc(mysqli_query($conn,
     "SELECT setting_value FROM settings WHERE setting_key = 'session_gap_minutes' LIMIT 1"));
 $SESSION_GAP = ($gap_row ? max(1, intval($gap_row['setting_value'])) : 30) * 60;
 
-// ── Pull every action in the window, in time order per user ───────────────────
-// One sequential pass; we build the gap series in PHP (cheaper and clearer than a
-// per-row correlated subquery). Benefits from an index on log(userid, timestamp) —
-// see migrations/2026-06-08_log_user_time_index.sql.
+// Nicknames for display.
 $nick = [];
 $nr = mysqli_query($conn, "SELECT id, nickname FROM users");
 while ($n = mysqli_fetch_assoc($nr)) $nick[(string)$n['id']] = $n['nickname'];
 mysqli_free_result($nr);
 
+// One time-ordered pass over the window; build each user's event stream, then
+// score via the shared library. (Benefits from idx_log_user_time.)
 $stream = mysqli_query($conn, "
-    SELECT userid, action_type, UNIX_TIMESTAMP(timestamp) AS ts
+    SELECT userid, action_type AS at, additional_value AS av, UNIX_TIMESTAMP(timestamp) AS ts
     FROM log
     WHERE timestamp >= NOW() - INTERVAL {$days} DAY
     ORDER BY userid, timestamp");
 
-$U = [];            // userid => accumulator
-$prev_uid = null;
-$prev_ts  = null;
-while ($row = mysqli_fetch_assoc($stream)) {
-    $uid = (string)$row['userid'];
-    $at  = (int)$row['action_type'];
-    $ts  = (int)$row['ts'];
-
-    if ($uid !== $prev_uid) { $prev_ts = null; }   // new user → no carry-over gap
-    if (!isset($U[$uid])) {
-        $U[$uid] = ['events'=>0,'skips'=>0,'fast_skips'=>0,'answers'=>0,
-                    'gaps'=>[], 'hours'=>[], 'first'=>$ts, 'last'=>$ts];
-    }
-    $u =& $U[$uid];
-    $u['events']++;
-    $u['last'] = $ts;
-    if ($at === $SKIP)               $u['skips']++;
-    if (in_array($at, $ANSWER, true)) $u['answers']++;
-    $u['hours'][intdiv($ts, 3600)] = ($u['hours'][intdiv($ts, 3600)] ?? 0) + 1;
-
-    if ($prev_ts !== null) {
-        $gap = $ts - $prev_ts;
-        if ($gap >= 0 && $gap <= $SESSION_GAP) {           // within-session only
-            $u['gaps'][] = $gap;
-            if ($at === $SKIP && $gap < $FAST_SKIP) $u['fast_skips']++;
-        }
-    }
-    unset($u);
-    $prev_uid = $uid;
-    $prev_ts  = $ts;
-}
+$by_user = [];
+while ($row = mysqli_fetch_assoc($stream)) $by_user[(string)$row['userid']][] = $row;
 mysqli_free_result($stream);
 
-// ── Score each account ────────────────────────────────────────────────────────
-function _median(array $a) {
-    if (!$a) return null;
-    sort($a); $n = count($a); $m = intdiv($n, 2);
-    return $n % 2 ? $a[$m] : ($a[$m-1] + $a[$m]) / 2;
-}
-function _cv(array $a) {                       // coefficient of variation = sd / mean
-    $n = count($a); if ($n < 2) return null;
-    $mean = array_sum($a) / $n; if ($mean <= 0) return null;
-    $var = 0; foreach ($a as $x) $var += ($x - $mean) ** 2;
-    return sqrt($var / $n) / $mean;
-}
-function _clamp($x) { return max(0, min(1, $x)); }
-
 $rows = [];
-foreach ($U as $uid => $u) {
-    if ($u['events'] < $MIN_EVENTS) continue;          // too little activity to judge
-
-    $fast_share = $u['events'] ? $u['fast_skips'] / $u['events'] : 0;
-    $skip_share = $u['events'] ? $u['skips'] / $u['events'] : 0;
-    $median     = _median($u['gaps']);
-    $cv         = count($u['gaps']) >= $MIN_GAPS_CV ? _cv($u['gaps']) : null;
-    $peak_hour  = $u['hours'] ? max($u['hours']) : 0;
-
-    // Each sub-signal mapped to 0..1 "intensity"; weights sum to 100.
-    $fs_int    = _clamp($fast_share / 0.5);                       // 50%+ fast-skips ⇒ maxed
-    $reg_int   = $cv !== null ? _clamp((0.6 - $cv) / 0.6) : 0;    // very even timing ⇒ high
-    $pace_int  = $median !== null ? _clamp((10 - $median) / 10) : 0; // ~0s gaps ⇒ high
-    $burst_int = _clamp(($peak_hour - 60) / 120);                 // 60→0, 180+/hr ⇒ maxed
-    $score = (int) round(40*$fs_int + 35*$reg_int + 15*$pace_int + 10*$burst_int);
-
-    // Plain-English reasons (only the ones that actually fired).
-    $why = [];
-    if ($u['fast_skips'] >= 10 && $fast_share >= 0.25)
-        $why[] = "{$u['fast_skips']} near-instant skips (".round(100*$fast_share)."% of actions)";
-    if ($cv !== null && $cv < 0.35)
-        $why[] = "very regular timing (CV ".round($cv,2).")";
-    if ($median !== null && $median < 4)
-        $why[] = "median ".round($median,1)."s between actions";
-    if ($peak_hour >= 90)
-        $why[] = "{$peak_hour} actions in one hour";
-
+foreach ($by_user as $uid => $events) {
+    $m = bp_metrics_from_stream($events, $SESSION_GAP);
+    $s = bp_score($m);
+    if ($s['score'] === null) continue;                 // too little activity to judge
     $rows[] = [
         'uid'=>$uid, 'nick'=>$nick[$uid] ?? '—',
-        'events'=>$u['events'], 'answers'=>$u['answers'],
-        'skips'=>$u['skips'], 'skip_share'=>$skip_share,
-        'fast_skips'=>$u['fast_skips'], 'fast_share'=>$fast_share,
-        'median'=>$median, 'cv'=>$cv, 'peak_hour'=>$peak_hour,
-        'score'=>$score, 'why'=>$why,
+        'events'=>$m['events'], 'answered'=>$m['answered'],
+        'skips'=>$m['skips'], 'skip_share'=>$m['skip_share'],
+        'fast_skips'=>$m['fast_skips'], 'fast_share'=>$m['fast_skip_share'],
+        'median'=>$m['median_gap'], 'cv'=>$m['cv'], 'peak_hour'=>$m['peak_hour'],
+        'accuracy'=>$m['accuracy'], 'score'=>$s['score'], 'why'=>bp_why($s['contributions']),
     ];
 }
-usort($rows, fn($a,$b) => $b['score'] <=> $a['score']);
+usort($rows, fn($a, $b) => $b['score'] <=> $a['score']);
 
-$strong = array_filter($rows, fn($r) => $r['score'] >= 50);
-$watch  = array_filter($rows, fn($r) => $r['score'] >= 25 && $r['score'] < 50);
+$strong = array_filter($rows, fn($r) => $r['score'] >= BP_BAND_RED);
+$watch  = array_filter($rows, fn($r) => $r['score'] >= BP_BAND_AMBER && $r['score'] < BP_BAND_RED);
 $top15  = array_slice($rows, 0, 15);
 
-// Colour helpers for the cells.
 function cell($val, $amber, $red, $invert=false) {
     if ($val === null) return '';
     $hot = $invert ? ($val <= $red) : ($val >= $red);
@@ -223,7 +134,6 @@ function cell($val, $amber, $red, $invert=false) {
         </div>
     </div>
 
-    <!-- Period picker -->
     <form method="GET" class="form-inline" style="margin-bottom:20px;">
         <label>Window: </label>
         <?php foreach ([1, 3, 7, 14, 30, 90] as $d): ?>
@@ -236,118 +146,86 @@ function cell($val, $amber, $red, $invert=false) {
         <h4>What is this page?</h4>
         <p style="font-size:13px; color:#444; margin-bottom:10px;">
             Two things can abuse the bot: a student <b>scripting their account to farm points</b>, and anyone
-            <b>scraping the question bank</b> (an automated client racing through questions to copy them out). This page
-            reads the activity log and looks for accounts that <b>behave like a script, not a person</b>. It is
-            <b>offline and silent</b> — it never blocks or messages anyone; it just shows you who looks suspicious so
-            <b>you</b> can decide whether to look closer.
+            <b>scraping the question bank</b>. This page reads the activity log and scores each account on how
+            <b>script-like vs human-like</b> it behaves. It is <b>offline and silent</b> — it never blocks or messages
+            anyone; it just ranks who's worth a closer look. <b>Click any account</b> to open its full profile.
         </p>
-        <p style="font-size:13px; color:#444; margin-bottom:6px;">The four human-vs-bot tells it uses:</p>
-        <ol>
-            <li><b>Fast-skip spam</b> — hammering "skip" in under <?= $FAST_SKIP ?> seconds, over and over. Skipping shows the
-                question and moves on with no thinking, so it's the cheapest way to harvest the bank.</li>
-            <li><b>Timing regularity</b> — a script that waits a fixed time between actions is <em>too even</em>. Real people
-                are irregular. This is the hardest signal to fake.</li>
-            <li><b>Inhuman pace</b> — a very small typical gap between actions (e.g. a couple of seconds, every time).</li>
-            <li><b>Marathon burst</b> — a huge number of actions crammed into a single hour.</li>
-        </ol>
+        <p style="font-size:13px; color:#444; margin-bottom:6px;">The score adds up <b>incriminating</b> behaviours and subtracts <b>reassuring</b> ones:</p>
+        <ul>
+            <li>🔴 <b>Incriminating</b> — fast-skip spam (harvesting), too-even timing (a script), inhuman pace, marathon bursts, suspiciously perfect/random accuracy.</li>
+            <li>🟢 <b>Reassuring</b> — human-band accuracy (real learning), weeks of regular use, broad engagement (surveys, leaderboards, badges).</li>
+        </ul>
+        <p class="muted" style="margin-top:6px;">So a <em>fast crammer</em> who answers thoughtfully, returns for weeks, and barely skips lands low — speed alone isn't enough to flag.</p>
     </div>
 
     <div class="caveat">
-        ⚠️ <b>These are signals, not proof.</b> A keen student cramming before the exam can look fast too — that's exactly
-        why nothing here takes action automatically. Treat a high score as <em>"worth a look"</em>, not <em>"guilty"</em>.
-        Open the account, see if the pattern is genuinely robotic (e.g. <em>hundreds</em> of sub-second skips in a row),
-        and only then decide. Accounts with fewer than <?= $MIN_EVENTS ?> actions in the window are skipped — too little to judge.
+        ⚠️ <b>These are signals, not proof.</b> Treat a high score as <em>"open the profile and check"</em>, not <em>"guilty"</em>.
+        Accounts with fewer than <?= BP_MIN_EVENTS ?> actions in the window are skipped — too little to judge.
     </div>
 
-    <!-- Summary tiles -->
     <div class="row">
         <div class="col-sm-3"><div class="stat-box"><div class="num"><?= count($rows) ?></div><div class="lbl">Accounts examined</div></div></div>
-        <div class="col-sm-3"><div class="stat-box"><div class="num" style="color:#c0392b;"><?= count($strong) ?></div><div class="lbl">Look automated (score ≥ 50)</div></div></div>
-        <div class="col-sm-3"><div class="stat-box"><div class="num" style="color:#b9770e;"><?= count($watch) ?></div><div class="lbl">Worth a look (25–49)</div></div></div>
+        <div class="col-sm-3"><div class="stat-box"><div class="num" style="color:#c0392b;"><?= count($strong) ?></div><div class="lbl">Look automated (≥ <?= BP_BAND_RED ?>)</div></div></div>
+        <div class="col-sm-3"><div class="stat-box"><div class="num" style="color:#b9770e;"><?= count($watch) ?></div><div class="lbl">Worth a look (<?= BP_BAND_AMBER ?>–<?= BP_BAND_RED-1 ?>)</div></div></div>
         <div class="col-sm-3"><div class="stat-box"><div class="num"><?= $days ?>d</div><div class="lbl">Window</div></div></div>
     </div>
 
-    <?php
-    // Auto takeaway from the actual top row.
-    if (!$rows): ?>
-        <div class="takeaway flat">📊 No account had at least <?= $MIN_EVENTS ?> actions in the last <?= $days ?> day(s) — nothing to assess yet. Try a wider window.</div>
-    <?php elseif ($strong):
-        $t = $rows[0]; ?>
-        <div class="takeaway warn">
-            📊 <b>In plain terms:</b> <b><?= count($strong) ?></b> account<?= count($strong)===1?'':'s' ?> look automated.
-            The top one (<b><?= htmlspecialchars($t['nick']) ?></b>) <?= $t['why'] ? implode('; ', array_map('htmlspecialchars',$t['why'])) : 'scored high on the timing signals' ?>.
-            Worth opening before anything else.
-        </div>
+    <?php if (!$rows): ?>
+        <div class="takeaway flat">📊 No account had at least <?= BP_MIN_EVENTS ?> actions in the last <?= $days ?> day(s) — nothing to assess yet. Try a wider window.</div>
+    <?php elseif ($strong): $t = $rows[0]; ?>
+        <div class="takeaway warn">📊 <b>In plain terms:</b> <b><?= count($strong) ?></b> account<?= count($strong)===1?'':'s' ?> look automated.
+            The top one (<b><?= htmlspecialchars($t['nick']) ?></b>) — <?= $t['why'] ? htmlspecialchars(implode('; ', $t['why'])) : 'high on the timing signals' ?>.
+            Click it to investigate.</div>
     <?php else: ?>
-        <div class="takeaway">📊 <b>In plain terms:</b> nobody crossed the "looks automated" line in this window
-            <?= $watch ? ' — but '.count($watch).' account(s) are a little fast and worth a glance.' : '. Activity looks human.' ?></div>
+        <div class="takeaway">📊 <b>In plain terms:</b> nobody crossed the "looks automated" line
+            <?= $watch ? ' — but '.count($watch).' account(s) are worth a glance.' : '. Activity looks human.' ?></div>
     <?php endif; ?>
 
-    <!-- Top suspicious chart -->
     <?php if ($top15 && $top15[0]['score'] > 0): ?>
     <div class="chart-wrap">
         <h4>Most suspicious accounts</h4>
-        <div class="help">💡 <b>How to read this.</b> Each bar is one account's <b>suspicion score (0–100)</b> — higher means
-            more bot-like. The score only <em>sorts</em> the list; the table below shows the raw numbers behind it so you can
-            judge for yourself. Red bars (≥ 50) are the ones to open first.</div>
+        <div class="help">💡 Each bar is one account's <b>suspicion score (0–100)</b>. The score only <em>sorts</em> the list;
+            open a profile to see the full breakdown. Red bars (≥ <?= BP_BAND_RED ?>) first.</div>
         <canvas id="suspChart" height="<?= max(90, count($top15)*22) ?>"></canvas>
     </div>
     <?php endif; ?>
 
-    <!-- Detail table -->
     <div class="panel-card">
         <h4>The numbers behind each account</h4>
-        <div class="help">💡 <b>What each column means.</b>
-            <b>Actions</b> = everything they did (answers, skips, menu taps). ·
-            <b>Skips</b> = how many questions they skipped, and what share of their actions that was. ·
-            <b>Fast-skips</b> = skips done in under <?= $FAST_SKIP ?>s (the harvesting tell). ·
-            <b>Median gap</b> = the typical seconds between two actions — <em>small = inhumanly fast</em>. ·
-            <b>Timing&nbsp;CV</b> = how <em>even</em> their pacing is — <em>low = robotic</em> (a person is jumpy). ·
-            <b>Peak/hr</b> = the most actions they packed into a single hour. ·
-            <b>Score</b> = the four combined. Red cells are the values pushing the score up.
-        </div>
+        <div class="help">💡 <b>Columns.</b> <b>Actions</b> = everything they did · <b>Skips</b> = questions skipped ·
+            <b>Fast-skips</b> = skips under <?= BP_FAST_SKIP_SECS ?>s (the harvest tell) · <b>Median gap</b> = typical seconds
+            between actions (small = fast) · <b>CV</b> = how even the pacing is (low = robotic) · <b>Peak/hr</b> = busiest hour ·
+            <b>Acc.</b> = % correct · <b>Score</b> = all signals combined. Red cells push the score up. <b>Click a row to drill in.</b></div>
         <table class="table table-condensed table-hover">
             <thead><tr>
                 <th>Account</th><th>Actions</th><th>Skips</th><th>Fast-skips</th>
-                <th>Median gap</th><th>Timing CV</th><th>Peak/hr</th><th>Score</th><th>Why flagged</th>
+                <th>Median gap</th><th>CV</th><th>Peak/hr</th><th>Acc.</th><th>Score</th><th>Why</th>
             </tr></thead>
             <tbody>
             <?php if (!$rows): ?>
-                <tr><td colspan="9" class="text-center muted" style="padding:20px;">No accounts with enough activity in this window.</td></tr>
+                <tr><td colspan="10" class="text-center muted" style="padding:20px;">No accounts with enough activity in this window.</td></tr>
             <?php endif; ?>
             <?php foreach ($rows as $r):
-                $rowcls = $r['score'] >= 50 ? 'row-red' : ($r['score'] >= 25 ? 'row-amber' : '');
-                $pillbg = $r['score'] >= 50 ? '#c0392b' : ($r['score'] >= 25 ? '#e0a800' : '#95a5a6');
+                $rowcls = $r['score'] >= BP_BAND_RED ? 'row-red' : ($r['score'] >= BP_BAND_AMBER ? 'row-amber' : '');
+                $pillbg = $r['score'] >= BP_BAND_RED ? '#c0392b' : ($r['score'] >= BP_BAND_AMBER ? '#e0a800' : '#95a5a6');
             ?>
-                <tr class="<?= $rowcls ?>">
-                    <td><b><?= htmlspecialchars($r['nick']) ?></b><br><span class="muted"><?= htmlspecialchars($r['uid']) ?></span></td>
-                    <td><?= $r['events'] ?><br><span class="muted"><?= $r['answers'] ?> answered</span></td>
+                <tr class="<?= $rowcls ?>" style="cursor:pointer;" onclick="location.href='user.php?id=<?= urlencode($r['uid']) ?>'">
+                    <td><b><?= htmlspecialchars($r['nick']) ?></b> <span class="muted">↗</span><br><span class="muted"><?= htmlspecialchars($r['uid']) ?></span></td>
+                    <td><?= $r['events'] ?><br><span class="muted"><?= $r['answered'] ?> answered</span></td>
                     <td><?= $r['skips'] ?> <span class="muted">(<?= round(100*$r['skip_share']) ?>%)</span></td>
                     <td class="<?= cell($r['fast_share'], 0.25, 0.5) ?>"><?= $r['fast_skips'] ?> <span class="muted">(<?= round(100*$r['fast_share']) ?>%)</span></td>
                     <td class="<?= cell($r['median'], 8, 4, true) ?>"><?= $r['median']===null ? '—' : round($r['median'],1).'s' ?></td>
                     <td class="<?= $r['cv']===null ? '' : cell($r['cv'], 0.6, 0.35, true) ?>"><?= $r['cv']===null ? '<span class="muted">n/a</span>' : round($r['cv'],2) ?></td>
                     <td class="<?= cell($r['peak_hour'], 90, 150) ?>"><?= $r['peak_hour'] ?></td>
+                    <td><?= $r['accuracy']===null ? '—' : round(100*$r['accuracy']).'%' ?></td>
                     <td><span class="score-pill" style="background:<?= $pillbg ?>;"><?= $r['score'] ?></span></td>
-                    <td class="why"><?= $r['why'] ? implode('<br>', array_map('htmlspecialchars', $r['why'])) : '—' ?></td>
+                    <td class="why"><?= $r['why'] ? htmlspecialchars(implode('; ', $r['why'])) : '—' ?></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
         </table>
-        <div class="muted">Timing CV needs at least <?= $MIN_GAPS_CV ?> in-session gaps to be meaningful — "n/a" means we didn't
-            have enough. Gaps longer than the session break (<?= round($SESSION_GAP/60) ?> min) are treated as the user stepping away,
-            not thinking, and don't count toward pace or regularity.</div>
-    </div>
-
-    <div class="intro">
-        <h4>What this page does <em>not</em> do</h4>
-        <ul>
-            <li>It <b>doesn't block or limit anyone</b> — it only reports. (Deciding whether to add a real cap comes later,
-                and only once this data shows a cap wouldn't hurt genuine crammers — see ROADMAP #7.)</li>
-            <li>It <b>can't catch a careful team</b> — several students each going at a human pace, splitting the bank between
-                them, leave no per-account anomaly. That's a known, accepted blind spot.</li>
-            <li>It <b>can't say which questions a skipper saw</b> — skips don't record the question id today, only that a skip
-                happened. Counts and timing are enough to flag the behaviour.</li>
-        </ul>
+        <div class="muted">CV needs ≥ <?= BP_MIN_GAPS_CV ?> in-session gaps to mean anything ("n/a" = too few). Gaps longer than the
+            session break (<?= round($SESSION_GAP/60) ?> min) count as stepping away, not thinking.</div>
     </div>
 
 </div>
@@ -365,7 +243,8 @@ new Chart(document.getElementById('suspChart'), {
     },
     options: {
         indexAxis: 'y', responsive: true, plugins: { legend: { display:false } },
-        scales: { x: { beginAtZero:true, max:100, title:{display:true, text:'Suspicion score (0–100)'} } }
+        scales: { x: { beginAtZero:true, max:100, title:{display:true, text:'Suspicion score (0–100)'} } },
+        onClick: (e, els) => { if (els.length) location.href = 'user.php?id=' + <?= json_encode(array_map(fn($r)=>$r['uid'], $top15)) ?>[els[0].index]; }
     }
 });
 </script>
