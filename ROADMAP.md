@@ -146,11 +146,9 @@ Dependencies (not trivial):
 - Admin UI: lecture selector → topic × complexity matrix; highlight empty cells and cells below a threshold.
 
 ### 7. Bot Abuse Prevention
-Concern: students running scripts against the bot to farm points / game leaderboards. Mitigations to evaluate:
-- Rate limiting per `user_id` (max N answers per minute)
-- Minimum think-time between question sent → answer
-- Anomaly detection on suspiciously fast/perfect runs
-- Captcha / survey checkpoints at milestones
+Concern: two threats — students scripting their account to **farm points / game leaderboards**, and any client **scraping the question bank**. Specced as **detection-first, enforcement-deferred** (no cap set blind): see **NFR-7** (requirements.md), **ADR-010** (design.md), and the feature spec [docs/features/abuse-detection.md](docs/features/abuse-detection.md).
+- **Phase 1 — committed:** offline, read-only `admin/abuse.php` that flags automated-looking accounts (fast-skip spam, over-regular event timing, marathon runs) for the professor to review. Silent — no block, no message — so it doesn't tip off a scraper or lock out a real crammer. Doubles as the *measurement* that a later cap would need.
+- **Phase 2 — contingent on that data, and only if abuse is seen:** delivery throttle / daily distinct-question cap (anti-exfiltration lever: text is exposed at send time, so throttle delivery not answers; cap also = ROADMAP #3a's daily-question cap) + lenient min think-time; milestone captcha/survey challenges as a last resort.
 
 ### 8. Student Learning Dashboard
 A rich, pedagogically-oriented stats view — not just numbers, but **actionable insight into what a student has mastered and where their gaps are**. Should answer: "how am I doing, which lectures should I review, where should I focus next?"

@@ -3,7 +3,7 @@
 **System:** isbot — a Telegram-based gamified quiz bot for an IE&M (Information
 Systems) course at Ben-Gurion University.
 **Status:** as-built baseline (reverse-engineered from the running system) +
-planned items. Last updated 2026-06-05.
+planned items. Last updated 2026-06-08.
 
 This is the system-wide requirements baseline. Per-feature specifications live
 in [features/](features/) and extend the IDs defined here. The living technical
@@ -146,6 +146,32 @@ on gamified learning.
 - **NFR-6 (Conventions)** *(built)* — snake_case DB identifiers; tunable knobs
   live in the `settings` table, not PHP constants; every entrypoint requires
   `bootstrap/app.php` directly (no `config.php` shim).
+- **NFR-7 (Abuse resistance / anti-scraping)** *(proposed)* — The bot must
+  resist two automated-abuse threats: **(a) point-farming** — an enrolled user
+  scripting their own account to inflate leaderboard rank and pollute research
+  data; and **(b) content exfiltration** — any client driving the bot to harvest
+  the ~530-question bank. Question text is exposed at *send* time (before any
+  answer), so the anti-exfiltration lever is throttling **delivery**, not
+  answers. Required controls, all fail-safe (generous defaults no real student
+  reaches). The approach is **detection-first, enforcement-deferred** (ADR-010):
+  - **Committed — offline behavioural detection.** A read-only batch analysis
+    over the `log` table flags accounts whose behaviour looks automated
+    (fast-skip spam, over-regular event timing, marathon runs). It takes **no
+    action** and is **invisible to users** — to avoid false-positive lockouts and
+    to not tip off a scraper. See
+    [features/abuse-detection.md](features/abuse-detection.md) (FR-DET-*).
+  - **Deferred, contingent on the data detection surfaces** — and only if abuse
+    is observed: a per-`user_id` throttle on question *delivery* (questions/min +
+    daily distinct cap, the cap foreshadowed in ROADMAP #3a), a lenient minimum
+    think-time, and last, milestone captcha/survey challenges — each a fail-safe
+    `settings` knob. A cap is **not** set blind: the crammer who legitimately
+    needs the whole bank in 3–4 days must never hit it.
+  Existing partial mitigations: session-scoped message cleanup (FR-SES-1 /
+  ADR-005) limits the *standing* visible corpus but is **trigger-based, not
+  timed** — it never wipes an active/just-finished session (mid-session export
+  captures it) and does nothing against live capture; the nickname gate
+  (FR-ONB-1) is one-time and not a real barrier. Design rationale,
+  threat model, and tiered rollout: design.md **ADR-010**.
 
 ---
 

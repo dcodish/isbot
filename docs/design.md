@@ -53,6 +53,15 @@ top 10 see themselves among nearby peers (goal-gradient / Hamari & Koivisto).
 Question messages are logged and wiped after an inactivity gap (delete, or edit
 to a placeholder past Telegram's 48h window). **Why:** mitigates content theft
 while keeping feedback/leaderboards/badges visible for review (FR-SES-1).
+**Known limits (not bulletproof, by design):** cleanup is **trigger-based, not
+timed** — it fires only when the *same user returns and acts* after the gap, so
+(a) an active or just-finished session is never wiped (mid-session export
+captures it intact) and (b) a user who never returns leaves their session
+standing indefinitely. And it does nothing against **live capture** (a Bot-API /
+userbot scraper stores each question the instant it arrives; later deletion
+can't un-capture it). It raises the bar against the realistic threat — a
+built-in Telegram "export chat history" done days later — not against a
+deliberate scraper. The latter is NFR-7 / ADR-010 territory.
 
 ### ADR-006 — Per-cohort week of progress · *accepted, planned*
 Replace the single global `settings.current_week` with a per-group week so the
@@ -90,6 +99,53 @@ rather than sparse day-N retention. **Trade-off:** the event study still carries
 streak confound (a reward fires mid-streak) — footnoted, not hidden — and honesty
 about limits is preferred over a cleaner-looking but misleading causal claim
 (FR-AN-1/2/3/8). Details: [features/gamification-analytics.md](features/gamification-analytics.md).
+
+### ADR-010 — Tiered anti-abuse / anti-scraping controls · *proposed*
+Two distinct adversaries, not one:
+- **Farmer (T1):** an enrolled student scripting *their own* account for
+  points/rank. Harms leaderboard integrity and research validity. Bounded to one
+  account and *correctness-seeking* (wants points) — so detectable via
+  perfect/fast-run anomalies.
+- **Exfiltrator (T2):** any client harvesting the ~530-question bank. Harms the
+  exam-prep value and future reuse of the questions. Points are irrelevant; it
+  may answer wrong on purpose and only needs each question *delivered once*.
+
+**Key realization:** a question's text is exposed the instant it is **sent**,
+before any answer. So throttling *answers* (the ROADMAP's first instinct) blunts
+farming but barely touches exfiltration. The anti-exfiltration lever is
+throttling **delivery** — questions/minute and distinct-questions/day per user —
+which dovetails with the daily-question-cap knob already foreshadowed in
+ROADMAP #3a.
+
+**Decision — detection first, enforcement deferred (revised):** we will *not*
+ship a cap or any user-visible throttle yet. A blind daily/rate cap risks
+penalising the exact student we most want to serve — the one cramming 3–4 days
+before the exam, who legitimately needs the whole bank fast — and we have **no
+data** on the real behaviour distribution to place that threshold safely.
+Instead:
+- **Phase 1 (committed) — offline detection.** A read-only, batch analysis over
+  the `log` table flags accounts whose *behaviour* looks automated (fast-skip
+  spam, over-regular event timing, marathon runs). It takes **no action** and is
+  **invisible to users** — deliberately, so a scraper isn't tipped off to adapt
+  and no honest student is ever blocked. It runs offline (admin-triggered /
+  periodic), never in the live message path. Spec:
+  [features/abuse-detection.md](features/abuse-detection.md) (FR-DET-*).
+- **Phase 2 (contingent) — enforcement, only if the data justifies it.** Phase 1
+  *is the measurement instrument*: it yields the distribution (real skip-rates,
+  typical inter-question time, honest marathon size) that tells us whether a cap
+  could ever sit above all legitimate use. Only then, and only if scraping is
+  actually observed, do we consider a delivery throttle / distinct-question cap
+  and, last, milestone challenges — each a fail-safe `settings` knob.
+
+**Trade-offs:** detection is *not* prevention — an offline flag won't stop a grab
+in progress. Accepted: the realistic threat is a slow harvest or a post-hoc
+Telegram export, and the cost of a false-positive lockout (blocking a real
+crammer) is judged worse than a delayed, human-reviewed catch. The cap is not
+abandoned, only **gated on evidence**. None of this stops a patient, distributed,
+slow scraper (a student team each sipping under any threshold); the goal stays:
+raise the cost of *bulk* harvest and give the professor *visibility*, not perfect
+prevention. Complements — does not replace — the session cleanup of ADR-005
+(NFR-7).
 
 ---
 
