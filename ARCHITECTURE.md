@@ -123,6 +123,10 @@ New users are blocked from playing until a unique nickname is set (3–15 chars,
 ### Admin Panel (`/admin/`)
 Session-authenticated web UI for question CRUD. Credentials from `.env`. Questions reported as unclear (`reportedbad` counter) appear at top of list. All DB operations in `admin/backend/save.php`.
 
+**Stats vs. analytics (two pages, deliberately split).**
+- `admin/stats.php` — *descriptive*: summary counts, a daily answers/active-users chart, and a per-user engagement table. Answers "how much is happening".
+- `admin/analytics.php` — *analytical*: measures the **impact of gamification on usage** from the `log` audit table. Five panels: (1) a **within-user event study** — answer volume in the `win` days before vs after each badge/level-up/leaderboard check, excluding events whose after-window hasn't elapsed; (2) **lifespan-based D1/D7/D30 retention** split by whether the user hit a gamification element in their first 24h, plus a per-signup-week cohort table; (3) a lifecycle **funnel** (start → nickname → answer → return → 7-day); (4) **reach** (% of active users per element); (5) **dead-badge** detection (badges with 0 earns). Read-only, no schema change; portable SQL (no CTEs — derived tables + correlated subqueries). Because `users` has no signup column, "first seen" is derived from `MIN(log.timestamp)`. The page leads with an explicit observational-data caveat — cross-sections are selection, the event study is the defensible within-user signal. Design rationale in [docs/design.md](docs/design.md) ADR-009; full spec in [docs/features/gamification-analytics.md](docs/features/gamification-analytics.md).
+
 ## Database Tables
 
 | Table | Purpose |

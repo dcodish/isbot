@@ -74,6 +74,23 @@ new Cohorts page) behind one landing that links to each section, rather than
 growing more standalone pages. Aligns with the unified-settings direction in
 ROADMAP #3a (FR-ADM-4).
 
+### ADR-009 — Within-user event study for gamification impact · *accepted, built*
+The analytics dashboard (`admin/analytics.php`) measures whether gamification
+drives usage from **observational** log data. The naive cross-section
+("leaderboard users answer more") is mostly selection bias — engaged users do
+both. **Decision:** lead with a **within-user event study** (a user's answer
+volume before vs after their *own* badge / level-up / leaderboard check), which
+differences out the per-user engagement level, and treat cross-sections (reach,
+retention splits) as suggestive context wrapped in an explicit "observational, not
+causal" caveat. **Two constraints forced into the design:** (1) recent events are
+**censored** out (their after-window hasn't elapsed) to avoid undercounting
+"after"; (2) `users` has **no signup column**, so retention derives first-seen
+from `MIN(log.timestamp)` and uses a lifespan-based (active-across-≥N-days) D1/7/30
+rather than sparse day-N retention. **Trade-off:** the event study still carries a
+streak confound (a reward fires mid-streak) — footnoted, not hidden — and honesty
+about limits is preferred over a cleaner-looking but misleading causal claim
+(FR-AN-1/2/3/8). Details: [features/gamification-analytics.md](features/gamification-analytics.md).
+
 ---
 
 ## Open / deferred

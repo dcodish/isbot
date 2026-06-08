@@ -92,7 +92,14 @@ on gamified learning.
 - **FR-ADM-1** *(built)* — Session-authenticated web admin panel for question
   CRUD; reported-unclear questions surface at the top.
 - **FR-ADM-2** *(built)* — Admin can set the global `current_week`.
-- **FR-ADM-3** *(built)* — Stats dashboard (`admin/stats.php`).
+- **FR-ADM-3** *(built)* — Descriptive stats dashboard (`admin/stats.php`):
+  summary counts, daily activity chart, per-user engagement table.
+- **FR-ADM-6** *(built)* — Gamification **analytics** dashboard
+  (`admin/analytics.php`): measures the impact of gamification elements on usage
+  via a within-user event study, retention splits, a lifecycle funnel, reach, and
+  dead-badge detection. Read-only; observational-data caveats made explicit. See
+  [features/gamification-analytics.md](features/gamification-analytics.md)
+  (FR-AN-*) and design.md ADR-009.
 - **FR-ADM-4** *(planned)* — A central admin hub linking the sections
   (Questions, Stats, Cohorts, future settings) instead of separate entry pages.
   See [features/cohorts.md](features/cohorts.md) (FR-COH-7).
@@ -105,6 +112,10 @@ on gamified learning.
 - **FR-RES-2** *(built)* — Every user-facing event is recorded in the `log`
   audit table; point transactions in `point_log` — both available for research
   export.
+- **FR-RES-3** *(built)* — The `log` audit table is analysed in-product by the
+  gamification analytics dashboard (FR-ADM-6) to study the effect of badges,
+  levels, and leaderboards on engagement. See
+  [features/gamification-analytics.md](features/gamification-analytics.md).
 
 ### 3.8 Question Authoring & Tooling (FR-TOOL)
 - **FR-TOOL-1** *(built)* — A `question-writer` Claude subagent drafts Hebrew
