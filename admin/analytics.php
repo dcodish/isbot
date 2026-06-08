@@ -198,6 +198,17 @@ $dead_badges = count(array_filter($badges, fn($b) => (int)$b['earns'] === 0));
         .nav-link { margin-bottom:20px; display:inline-block; }
         .caveat { background:#fff8e1; border-left:3px solid #f0ad4e; padding:8px 12px;
             font-size:12px; color:#6b5900; border-radius:3px; margin-bottom:16px; }
+        .help { background:#eef5fb; border-left:3px solid #5b9bd5; padding:10px 14px;
+            font-size:13px; color:#2c3e50; border-radius:3px; margin-bottom:14px; line-height:1.5; }
+        .help b { color:#2c5f8a; }
+        .takeaway { background:#eafaf1; border-left:3px solid #27ae60; padding:10px 14px;
+            font-size:14px; color:#1e5631; border-radius:3px; margin-top:14px; }
+        .takeaway.flat { background:#f4f6f7; border-left-color:#95a5a6; color:#555; }
+        .intro { background:#fff; border-radius:4px; padding:18px 22px; margin-bottom:24px;
+            box-shadow:0 1px 3px rgba(0,0,0,.08); }
+        .intro h4 { margin-top:0; color:#435d7d; }
+        .intro ol { margin:0; padding-left:20px; }
+        .intro li { margin-bottom:4px; font-size:13px; color:#444; }
     </style>
 </head>
 <body>
@@ -226,15 +237,41 @@ $dead_badges = count(array_filter($badges, fn($b) => (int)$b['earns'] === 0));
         <?php endforeach; ?>
     </form>
 
+    <div class="intro">
+        <h4>What is this page?</h4>
+        <p style="font-size:13px; color:#444; margin-bottom:10px;">
+            The bot rewards students with <b>badges</b>, <b>levels</b>, and <b>leaderboards</b>. This page asks one
+            question: <b>do those rewards actually make students use the bot more?</b> It reads the activity log and
+            looks at it five ways:
+        </p>
+        <ol>
+            <li><b>Event impact</b> — when a student earns a reward, do they answer more questions right afterward?</li>
+            <li><b>Retention</b> — do students who engage with rewards keep coming back longer?</li>
+            <li><b>Funnel</b> — of everyone who starts the bot, how many reach each milestone?</li>
+            <li><b>Reach</b> — what share of active students actually use each feature?</li>
+            <li><b>Badges</b> — which badges are popular, and which has nobody ever earned?</li>
+        </ol>
+    </div>
+
     <div class="caveat">
-        ⚠️ This is observational data. Cross-sectional gaps (e.g. "leaderboard users answer more") are mostly
-        <em>selection</em>, not causation. The event-study below compares each user to themselves around an event —
-        the most defensible within-user signal of impact.
+        ⚠️ <b>One thing to keep in mind.</b> This is real usage data, not an experiment. So when you see
+        "students who check the leaderboard answer more", that's partly because <em>keen students do both</em> —
+        it doesn't prove the leaderboard <em>caused</em> it. Section&nbsp;1 (Event impact) is the most trustworthy,
+        because it compares each student to <em>their own</em> behaviour just before and after a reward.
     </div>
 
     <!-- ── 1. Event study ───────────────────────────────────────────── -->
     <div class="chart-wrap">
-        <h4>1. Event impact — answers per user, ±<?= $win ?> days around each event (last <?= $days ?>d)</h4>
+        <h4>1. Event impact — does a reward boost answering?</h4>
+        <div class="help">
+            💡 <b>How to read this.</b> For every time a student earned a badge, levelled up, or checked the
+            leaderboard, we count how many questions that same student answered in the <b><?= $win ?> days before</b>
+            the reward versus the <b><?= $win ?> days after</b>. If the green "After" bar is taller than the grey
+            "Before" bar, students tend to answer more <em>after</em> the reward — a sign it re-engages them.
+            <br><span class="muted">Columns: <b>n</b> = how many such events · <b>Before/After</b> = avg questions
+            answered per student in each window · <b>Δ</b> = the change · <b>↑ users</b> = the share of events where
+            that student answered more afterward.</span>
+        </div>
         <div class="row">
             <div class="col-sm-7"><canvas id="eventChart" height="120"></canvas></div>
             <div class="col-sm-5">
@@ -259,13 +296,48 @@ $dead_badges = count(array_filter($badges, fn($b) => (int)$b['earns'] === 0));
                 </table>
             </div>
         </div>
-        <div class="muted">"↑ users" = share of events after which that user answered more than before. Events whose full
-            after-window hasn't elapsed yet are excluded so "after" isn't undercounted.</div>
+        <?php
+        // Plain-English takeaway from the actual numbers.
+        $ev_lines = [];
+        $ev_any_up = false;
+        foreach ($event_study as $e) {
+            if ($e['events'] === 0) continue;
+            $d = $e['avg_after'] - $e['avg_before'];
+            if ($e['avg_before'] > 0) {
+                $pc = round(100 * $d / $e['avg_before']);
+                $dir = $d > 0.05 ? "<b>+{$pc}% more</b>" : ($d < -0.05 ? "<b>{$pc}% fewer</b>" : "about the same");
+            } else {
+                $dir = $d > 0.05 ? "<b>more</b>" : "about the same";
+            }
+            if ($d > 0.05) $ev_any_up = true;
+            $name = trim(preg_replace('/^[^\p{L}]+/u', '', $e['label']));
+            $ev_lines[] = "after <b>{$name}</b>, students answered {$dir} questions ({$e['avg_before']} → {$e['avg_after']})";
+        }
+        ?>
+        <?php if ($ev_lines): ?>
+            <div class="takeaway <?= $ev_any_up ? '' : 'flat' ?>">
+                📊 <b>In plain terms:</b> <?= ucfirst(implode('; ', $ev_lines)) ?>.
+                <?= $ev_any_up
+                    ? 'A jump after the reward suggests it nudges students to keep playing'
+                    : 'No clear jump after the reward in this period' ?> —
+                <span class="muted">but remember rewards often land mid-streak, so part of any rise would happen anyway.</span>
+            </div>
+        <?php else: ?>
+            <div class="takeaway flat">📊 No completed events in this period yet — try a longer period above.</div>
+        <?php endif; ?>
+        <div class="muted" style="margin-top:8px;">Very recent events are left out, because their "after" window hasn't finished yet.</div>
     </div>
 
     <!-- ── 2. Retention ─────────────────────────────────────────────── -->
     <div class="chart-wrap">
-        <h4>2. Retention — by early gamification engagement</h4>
+        <h4>2. Retention — do students keep coming back?</h4>
+        <div class="help">
+            💡 <b>How to read this.</b> <b>D1 / D7 / D30</b> mean: of the students who've been around long enough,
+            what share were still active <b>at least 1, 7, and 30 days</b> after they first started. Higher is better —
+            it means people stick with the bot. We split students into two groups: those who touched a reward
+            (earned a badge or checked the leaderboard) <b>on their very first day</b> (green) versus those who
+            didn't (red). If green stays higher, early reward-engagement goes hand-in-hand with sticking around.
+        </div>
         <div class="row">
             <div class="col-sm-7"><canvas id="retChart" height="120"></canvas></div>
             <div class="col-sm-5">
@@ -287,17 +359,37 @@ $dead_badges = count(array_filter($badges, fn($b) => (int)$b['earns'] === 0));
                 </table>
             </div>
         </div>
-        <div class="muted">DN = share of users active across ≥ N days from first contact. "Gamified in first 24h" =
-            earned a badge or checked the leaderboard on day 0. Denominators exclude users too new to have reached day N.
-            Divergence is suggestive, not causal — early gamification may be a marker of motivated users.</div>
+        <?php
+        $g7 = ret_pct($ret['gam'][7]); $n7 = ret_pct($ret['nogam'][7]);
+        $ret_flat = ($g7 === null || $n7 === null);
+        ?>
+        <div class="takeaway <?= $ret_flat || $g7 <= $n7 ? 'flat' : '' ?>">
+            📊 <b>In plain terms:</b>
+            <?php if ($ret_flat): ?>
+                not enough students have been around 7+ days yet to compare the two groups — check back later or pick a wider lens.
+            <?php elseif ($g7 > $n7): ?>
+                students who touched a reward on day&nbsp;one were still active a week later <b><?= $g7 ?>%</b> of the time,
+                versus <b><?= $n7 ?>%</b> for those who didn't — early reward-engagement lines up with better staying power.
+            <?php else: ?>
+                at the 7-day mark the two groups look similar (<?= $g7 ?>% vs <?= $n7 ?>%), so early reward-engagement isn't
+                clearly linked to staying longer in this data.
+            <?php endif; ?>
+            <span class="muted">This is an association, not proof — keen students may simply do both.</span>
+        </div>
+        <div class="muted" style="margin-top:8px;">"Active across ≥ N days" = the time between a student's first and last
+            activity is at least N days. Students too new to have reached a given day are left out of that column's count.</div>
     </div>
 
     <!-- Cohort breakdown -->
     <?php if ($cohorts): ?>
     <div class="panel-card">
-        <h4>Retention by signup week (cohort)</h4>
+        <h4>Retention by sign-up week</h4>
+        <div class="help">💡 The same "still active after 1/7/30 days" numbers, but split by the week each group of
+            students <b>first joined</b>. Lets you see whether newer groups are sticking around better or worse than
+            older ones. The number in brackets is how many students in that week are old enough to count;
+            <b>young</b> means that group hasn't existed long enough yet to measure that column.</div>
         <table class="table table-bordered table-condensed">
-            <thead><tr><th>Week (first seen)</th><th>Users</th><th>D1</th><th>D7</th><th>D30</th></tr></thead>
+            <thead><tr><th>Week joined</th><th>Students</th><th>D1</th><th>D7</th><th>D30</th></tr></thead>
             <tbody>
             <?php foreach (array_reverse($cohorts, true) as $week => $c): ?>
                 <tr>
@@ -310,29 +402,59 @@ $dead_badges = count(array_filter($badges, fn($b) => (int)$b['earns'] === 0));
             <?php endforeach; ?>
             </tbody>
         </table>
-        <div class="muted">Parenthetical = eligible users (old enough for that horizon). "young" = cohort hasn't aged N days.</div>
     </div>
     <?php endif; ?>
 
     <!-- ── 3. Funnel ────────────────────────────────────────────────── -->
+    <?php
+    // Biggest drop-off between consecutive funnel stages.
+    $worst = null;
+    for ($i = 1; $i < count($funnel); $i++) {
+        $prev = $funnel[$i-1][1]; $cur = $funnel[$i][1];
+        if ($prev > 0) {
+            $lost = $prev - $cur; $lost_pct = round(100 * $lost / $prev);
+            if ($worst === null || $lost_pct > $worst['pct']) {
+                $worst = ['pct'=>$lost_pct, 'from'=>$funnel[$i-1][0], 'to'=>$funnel[$i][0], 'lost'=>$lost];
+            }
+        }
+    }
+    ?>
     <div class="chart-wrap">
-        <h4>3. Lifecycle funnel (all-time)</h4>
+        <h4>3. Funnel — where do we lose people?</h4>
+        <div class="help">💡 <b>How to read this.</b> Every student starts at the top (tapped <b>/start</b>) and we
+            track how many reach each next milestone. Each bar is shorter than the one above because some students drop
+            off. Hover a bar to see what % of the previous step it kept. The <b>biggest shrinkage</b> is where you're
+            losing the most students — the place worth fixing first.</div>
         <canvas id="funnelChart" height="90"></canvas>
-        <div class="muted">Milestones ever reached. % is conversion from the previous stage.</div>
+        <?php if ($worst): ?>
+        <div class="takeaway <?= $worst['pct'] >= 40 ? '' : 'flat' ?>">
+            📊 <b>In plain terms:</b> the biggest drop is between
+            "<?= htmlspecialchars(trim(preg_replace('/^[^\p{L}]+/u','',$worst['from']))) ?>" and
+            "<?= htmlspecialchars(trim(preg_replace('/^[^\p{L}]+/u','',$worst['to']))) ?>" —
+            <b><?= $worst['pct'] ?>%</b> of students (<?= $worst['lost'] ?> people) don't make it past that step.
+        </div>
+        <?php endif; ?>
+        <div class="muted" style="margin-top:8px;">These are milestones ever reached, all-time. They're roughly in order,
+            so a student near the bottom has almost certainly done the steps above too.</div>
     </div>
 
     <!-- ── 4. Reach ─────────────────────────────────────────────────── -->
     <div class="row">
         <div class="col-sm-6">
             <div class="chart-wrap">
-                <h4>4. Gamification reach — last <?= $days ?>d</h4>
+                <h4>4. Reach — who actually uses each feature?</h4>
+                <div class="help">💡 Of the <b><?= $active_period ?> students</b> active in the last <?= $days ?> days,
+                    what share used each feature at least once. A short bar means few students discover or bother with
+                    that feature — it might need to be more visible, or isn't pulling its weight.</div>
                 <canvas id="reachChart" height="160"></canvas>
-                <div class="muted">% of the <?= $active_period ?> users active in the period who touched each element.</div>
             </div>
         </div>
         <div class="col-sm-6">
             <div class="panel-card">
-                <h4>Badge earn counts <?php if ($dead_badges): ?><span class="delta-down">— <?= $dead_badges ?> never earned</span><?php endif; ?></h4>
+                <h4>Badge popularity <?php if ($dead_badges): ?><span class="delta-down">— <?= $dead_badges ?> never earned</span><?php endif; ?></h4>
+                <div class="help">💡 How many students have earned each badge, rarest first. A badge with
+                    <b>0 — dead</b> (red) has <b>never been earned by anyone</b> — it may be too hard, or impossible to
+                    trigger because of a bug. Worth checking or retiring.</div>
                 <table class="table table-condensed" style="max-height:340px; display:block; overflow-y:auto;">
                     <thead><tr><th></th><th>Badge</th><th>Earned by</th></tr></thead>
                     <tbody>
@@ -345,7 +467,6 @@ $dead_badges = count(array_filter($badges, fn($b) => (int)$b['earns'] === 0));
                     <?php endforeach; ?>
                     </tbody>
                 </table>
-                <div class="muted">All-time. Dead badges (0 earns) are unreachable or too hard — design candidates to fix or retire.</div>
             </div>
         </div>
     </div>
