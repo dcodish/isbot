@@ -1366,6 +1366,13 @@ function showStatsCard() {
     $attempts = $ok + $wrong;
     $accuracy = $attempts > 0 ? (int) round(100 * $ok / $attempts) : null;
 
+    // Size of the pool the user can actually reach right now: the same lecture
+    // filter the question picker uses, resolved against this user's cohort week
+    // (getCurrentWeek falls back to settings.current_week for cohort-less users).
+    $week = intval(getCurrentWeek($user_id));
+    $availableTotal = intval(mysqli_fetch_assoc(mysqli_query($db,
+        "SELECT COUNT(*) AS c FROM questions WHERE max_lecture IS NULL OR max_lecture <= $week"))['c']);
+
     // --- All-time rank (reuse the leaderboard's own eligibility/order) ----
     $allEntries = fetchAllTimeEntries($db);
     $allTotal   = count($allEntries);
@@ -1449,7 +1456,10 @@ function showStatsCard() {
     } else {
         $msg .= $rlm . "✅ דיוק: —\n";
     }
-    $msg .= $rlm . "📝 נחשפת ל-{$lri}{$seen}{$pdi} שאלות\n";
+    $msg .= $rlm . "📝 נחשפת ל-{$lri}{$seen}{$pdi} מתוך {$lri}{$availableTotal}{$pdi} שאלות זמינות\n";
+    if ($availableTotal > 0) {
+        $msg .= $rlm . "   " . $bar($seen / $availableTotal) . "\n";
+    }
 
     // Streak (only worth showing once it's a real run)
     if ($streak >= 2) {
