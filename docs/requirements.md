@@ -61,7 +61,10 @@ on gamified learning.
 
 ### 3.3 Gamification (FR-GAM)
 - **FR-GAM-1** *(built)* — Users progress through 4 levels via a `current_run`
-  counter measured against per-level thresholds in `gamification`.
+  counter measured against per-level thresholds in `gamification`, **independent
+  of `overall_points`**. Level 4 (the cap) holds `current_run ≤ 0` so demotion
+  stays reachable: four wrong answers in a row drop back to level 3 (a correct
+  offsets one). See design.md ADR-011.
 - **FR-GAM-2** *(built)* — Points are awarded per answer by (action × question
   level) rules in `point_rules`; every transaction is logged in `point_log`.
 - **FR-GAM-3** *(built)* — 30+ badges awarded for streaks, milestones,
@@ -69,6 +72,13 @@ on gamified learning.
   to **both** `users.overall_points` and `point_log` (with `question_id = NULL`).
 - **FR-GAM-4** *(built)* — A trophy-closet composite image shows earned (color)
   vs locked (grayscale) badges.
+- **FR-GAM-5** *(built)* — A player **stats card** (`/stats` command + main-menu
+  button) consolidates the gamification picture in one message: level + progress
+  to next (or top-level demotion risk), points + all-time rank, weekly standing,
+  accuracy, coverage of the cohort-available pool, current streak, badge count,
+  and an **estimated exam grade** — % correct over the most recent 40 answers
+  (the exam is 40 questions), shown only at a full 40-answer window; pass = 56.
+  See ARCHITECTURE.md §Player Stats Card.
 
 ### 3.4 Leaderboards (FR-LB)
 - **FR-LB-1** *(built)* — Three leaderboards: all-time, weekly (rolling 7-day),

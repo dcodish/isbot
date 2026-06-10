@@ -37,6 +37,7 @@ Conventions and the source-of-truth split are in [docs/README.md](docs/README.md
 - **Imagick only via Plesk PHP**: the webhook runs under `/opt/plesk/php/8.2/bin/php` which has Imagick loaded; the default `/usr/bin/php` does not. Trophy-closet image composition uses it. Guard with `extension_loaded('imagick')` and provide a text fallback for any code path that might run outside the webhook context.
 - **Session cleanup**: every question message sent to a user is logged to `session_question_messages`. After `settings.session_gap_minutes` of inactivity, `maybeStartNewSession()` deletes those messages (or edits them to a placeholder if they're older than Telegram's 48h delete window). If you add new places where questions get rendered, make sure they log their `message_id` with `logSessionQuestionMessage()`.
 - **Probation pool**: questions with `numofanswers < 5` are routed through a probation query (30% L1, 25% L2, 20% L3, 15% L4) to avoid single-sample classification stranding them at an extreme level. Don't remove the `numofanswers < 5` check without replacing it.
+- **Level-4 `current_run` cap**: leveling runs on `current_run` vs `gamification` thresholds, **decoupled from `overall_points`** (which only grows). At level 4, correct answers are capped at `current_run = 0` in `recordAnswer()`; remove that cap and the run grows unbounded, making demotion unreachable — the exact bug ADR-011 fixed. L4 `downgrade_at` must also stay **above** the `-4` floor in the wrong-answer branch (it's `-3`), or the threshold can never be crossed.
 
 ## Server Deployment
 
