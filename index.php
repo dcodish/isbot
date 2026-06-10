@@ -142,12 +142,15 @@ switch ($text) {
         $level = intval($fetch['level']);
         $currentRun = intval($fetch['current_run']);
 
-        // Threshold for next-level progress line
+        // Thresholds: upgrade_at for the progress line, downgrade_at for the
+        // top-level demotion-risk line.
         $upgradeAt = null;
-        $gRes = mysqli_query($db, "SELECT upgrade_at FROM gamification WHERE level = " . intval($level));
+        $downAt = null;
+        $gRes = mysqli_query($db, "SELECT upgrade_at, downgrade_at FROM gamification WHERE level = " . intval($level));
         if ($gRes && mysqli_num_rows($gRes) > 0) {
             $gRow = mysqli_fetch_assoc($gRes);
             $upgradeAt = intval($gRow['upgrade_at']);
+            $downAt = intval($gRow['downgrade_at']);
             mysqli_free_result($gRes);
         }
 
@@ -156,12 +159,25 @@ switch ($text) {
         $lri = "\u{2066}"; $pdi = "\u{2069}";
         $msg  = $rlm . "📊 הרמה שלך\n\n";
         $msg .= $rlm . "🎯 רמה נוכחית: {$lri}{$level}{$pdi}\n";
-        $msg .= $rlm . "📈 ציון בתוך השלב: {$lri}{$currentRun}{$pdi}\n";
+        // "Score within the level" only makes sense below the cap. At level 4
+        // current_run is a wrong-streak counter (≤ 0), not a score, so we show
+        // demotion proximity instead (see the top-level branch below).
+        if ($level < 4) {
+            $msg .= $rlm . "📈 ציון בתוך השלב: {$lri}{$currentRun}{$pdi}\n";
+        }
 
         // Progress-to-next-level line. Level 4 is the cap (upgrade_at is set to a
         // large sentinel value in the gamification table), so treat it as "maxed".
         if ($level >= 4) {
-            $msg .= $rlm . "🏆 אתה ברמה הגבוהה ביותר!\n\n";
+            $msg .= $rlm . "🏆 אתה ברמה הגבוהה ביותר!\n";
+            if ($downAt !== null) {
+                // Wrong answers in a row drop you to level 3; a correct answer
+                // offsets one. Remaining = how many consecutive wrongs from here.
+                $remaining = $currentRun - $downAt + 1;
+                if ($remaining < 1) { $remaining = 1; }
+                $msg .= $rlm . "🛡️ עוד {$lri}{$remaining}{$pdi} טעויות ברצף ותרד לרמה {$lri}3{$pdi}\n";
+            }
+            $msg .= "\n";
         } elseif ($upgradeAt !== null) {
             $needed = max(0, $upgradeAt - $currentRun);
             $next = $level + 1;

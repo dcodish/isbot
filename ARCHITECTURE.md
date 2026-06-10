@@ -35,7 +35,7 @@ Users progress through 4 levels. Question selection is **probability-based on su
 - Level 2: mix of 70–80% and 80%+ questions
 - Level 3/4: increasingly harder questions, no repeats allowed
 
-Progression controlled by `current_run` counter in `users` table vs. thresholds in `gamification` table. Correct answers increment, wrong answers decrement.
+Progression controlled by the `current_run` counter in the `users` table vs. per-level `upgrade_at` / `downgrade_at` thresholds in the `gamification` table — **independent of `overall_points`**. Correct answers increment `current_run`, wrong answers decrement; hitting `upgrade_at` promotes (and resets `current_run` to 0), dropping below `downgrade_at` demotes. **Level 4 is the cap:** there is no promotion, and correct answers are capped at `current_run = 0` so the run can't bank an unbounded cushion — that keeps demotion reachable. With L4 `downgrade_at = -3`, **four wrong answers in a row** (a correct one offsets a single wrong) demote back to level 3. See ADR-011 in [docs/design.md](docs/design.md).
 
 **Probation pool for new questions.** Questions with `numofanswers < 5` are treated as "unrated" and are sampled by every level at fixed rates (L1 30% / L2 25% / L3 20% / L4 15%) before the normal success-rate buckets are consulted. Without this, a single wrong first answer would put the question at 0% success rate and strand it in L4 forever; a single right answer would lock it to L1. After 5 answers accumulate, the regular bands classify it naturally. See `getQuestion()` in `bot_functions.php`.
 

@@ -147,6 +147,36 @@ raise the cost of *bulk* harvest and give the professor *visibility*, not perfec
 prevention. Complements — does not replace — the session cleanup of ADR-005
 (NFR-7).
 
+### ADR-011 — Bounded top-level demotion · *accepted, built*
+Leveling (1–4) runs on the `current_run` counter vs. per-level `upgrade_at` /
+`downgrade_at` thresholds in `gamification` — deliberately **decoupled from
+`overall_points`**, since points only ever grow and so can't gate up/down moves.
+For levels 1–3 `current_run` resets to 0 on a level-up and is bounded by
+`upgrade_at` above, so it stays in a small band. **Level 4 (the cap) had no such
+bound:** correct answers kept incrementing `current_run` with no reset and no
+cap, so it drifted unboundedly (a real user reached **323**) and demotion — which
+fires when `current_run < downgrade_at` — became unreachable. A second, independent
+bug: L4 `downgrade_at` was `-5`, but the wrong-answer branch floors `current_run`
+at `-4`, so it could never cross `-5` even at `current_run = 0`.
+
+**Decision — keep the top level demotable via a bounded wrong-streak:**
+- **Cap `current_run` at 0 for level-4 correct answers.** Points are still
+  awarded; the in-level run just can't bank a positive cushion. A correct answer
+  therefore offsets exactly one prior wrong (and no more), so it doesn't *fully*
+  reset a streak but does reward recovery.
+- **Set L4 `downgrade_at = -3`** (above the `-4` floor so it actually fires):
+  **4 wrong answers in a row** (no correct in between) demote to level 3; a
+  correct mid-streak pulls back toward 0 and buys one more. Single-value tunable
+  (`-2`⇒3, `-3`⇒4, `-4`⇒5).
+- **One-off state reset** of existing inflated L4 `current_run` values to 0 so the
+  rule applies immediately, not after hundreds of wrongs.
+
+**Trade-off:** with no positive cushion a level-4 player is always exactly four
+consecutive wrongs from demotion, even right after a long correct run — but that
+is the intended "stay sharp at the top" pressure, and the correct-offset keeps
+isolated mistakes harmless. Migration:
+`migrations/2026-06-10_l4_downgrade_threshold.sql`.
+
 ---
 
 ## Open / deferred

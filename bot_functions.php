@@ -1348,11 +1348,14 @@ function showStatsCard() {
     $currentRun = $u ? intval($u['current_run']) : 0;
     $points     = $u ? intval($u['overall_points']) : 0;
 
-    // Next-level threshold for the current level (sentinel-large at the cap).
-    $upgradeAt = null;
-    $g = mysqli_query($db, "SELECT upgrade_at FROM gamification WHERE level = $level");
+    // Thresholds for the current level (upgrade_at sentinel-large at the cap;
+    // downgrade_at drives the top-level demotion-risk hint).
+    $upgradeAt = null; $downAt = null;
+    $g = mysqli_query($db, "SELECT upgrade_at, downgrade_at FROM gamification WHERE level = $level");
     if ($g && mysqli_num_rows($g) > 0) {
-        $upgradeAt = intval(mysqli_fetch_assoc($g)['upgrade_at']);
+        $gRow = mysqli_fetch_assoc($g);
+        $upgradeAt = intval($gRow['upgrade_at']);
+        $downAt    = intval($gRow['downgrade_at']);
         mysqli_free_result($g);
     }
 
@@ -1426,6 +1429,11 @@ function showStatsCard() {
     $msg .= $rlm . "🎯 רמה {$lri}{$level}{$pdi}\n";
     if ($level >= 4 || $upgradeAt === null) {
         $msg .= $rlm . "🏆 הגעת לרמה הגבוהה ביותר!\n";
+        // Warn only once a wrong streak is actually building (current_run < 0).
+        if ($level >= 4 && $downAt !== null && $currentRun < 0) {
+            $remaining = max(1, $currentRun - $downAt + 1);
+            $msg .= $rlm . "   🛡️ עוד {$lri}{$remaining}{$pdi} טעויות ברצף ותרד לרמה {$lri}3{$pdi}\n";
+        }
     } else {
         $frac   = $upgradeAt > 0 ? $currentRun / $upgradeAt : 0;
         $needed = max(0, $upgradeAt - $currentRun);
@@ -1617,8 +1625,17 @@ function recordAnswer($qid, $type){
 
                 // Badge check will happen after answer message
             } else {
+                // Level 4 is the cap: correct answers still award points, but the
+                // in-level run must not bank an unbounded positive cushion — if it
+                // does, the wrong-streak demotion (downgrade_at) becomes unreachable
+                // (this is how current_run reached 323). Hold it at 0 so only a
+                // genuine wrong streak with no correct in between can push it below
+                // the threshold. Leveling stays decoupled from overall_points.
+                if ($level == 4 && $currentRun > 0) {
+                    $currentRun = 0;
+                }
                 $query = "Update users set current_run=".$currentRun. " WHERE id=".$user_id ;
-                $result = mysqli_query($db, $query);	
+                $result = mysqli_query($db, $query);
             }
 
             // Return flag to check badges after answer message is sent
