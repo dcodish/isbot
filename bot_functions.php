@@ -1342,6 +1342,18 @@ function demotionRiskText($remaining) {
 }
 
 /**
+ * Short qualitative comment for an estimated exam grade (Israeli scale, 60 = pass).
+ */
+function examGradeComment($grade) {
+    $g = intval($grade);
+    if ($g >= 90) return "מצוין! 🌟";
+    if ($g >= 80) return "טוב מאוד 👏";
+    if ($g >= 70) return "טוב 👍";
+    if ($g >= 60) return "עובר — אפשר לשפר";
+    return "מתחת לעובר — בוא נתרגל עוד 💪";
+}
+
+/**
  * Render the player "stats card" — a single rich message that pulls together the
  * gamification picture (level + progress to next, points + leaderboard rank,
  * weekly standing, accuracy, current streak, badge collection) instead of the
@@ -1390,6 +1402,24 @@ function showStatsCard() {
     $week = intval(getCurrentWeek($user_id));
     $availableTotal = intval(mysqli_fetch_assoc(mysqli_query($db,
         "SELECT COUNT(*) AS c FROM questions WHERE max_lecture IS NULL OR max_lecture <= $week"))['c']);
+
+    // --- Exam-grade estimate: % correct over the most recent 40 answers ---
+    // The final exam is 40 questions, so the last 40 answer events are a natural
+    // "what would I score now" proxy. point_log action_type 1/2 = correct/wrong;
+    // NULL rows are badge bonuses and are excluded. Grade is over the actual
+    // window (capped at 40), not always /40, so a short history isn't penalised.
+    $examWindow = 0; $examCorrect = 0;
+    $er = mysqli_query($db, "SELECT action_type FROM point_log
+                             WHERE user_id = $uid AND action_type IN (1,2)
+                             ORDER BY p_log_id DESC LIMIT 40");
+    if ($er) {
+        while ($row = mysqli_fetch_assoc($er)) {
+            $examWindow++;
+            if (intval($row['action_type']) === 1) $examCorrect++;
+        }
+        mysqli_free_result($er);
+    }
+    $examGrade = $examWindow > 0 ? (int) round(100 * $examCorrect / $examWindow) : null;
 
     // --- All-time rank (reuse the leaderboard's own eligibility/order) ----
     $allEntries = fetchAllTimeEntries($db);
@@ -1447,7 +1477,7 @@ function showStatsCard() {
         // Warn only once a wrong streak is actually building (current_run < 0).
         if ($level >= 4 && $downAt !== null && $currentRun < 0) {
             $remaining = max(1, $currentRun - $downAt + 1);
-            $msg .= $rlm . "   🛡️ " . demotionRiskText($remaining) . "\n";
+            $msg .= $rlm . "🛡️ " . demotionRiskText($remaining) . "\n";
         }
     } else {
         $frac   = $upgradeAt > 0 ? $currentRun / $upgradeAt : 0;
@@ -1482,6 +1512,19 @@ function showStatsCard() {
     $msg .= $rlm . "📝 נחשפת ל-{$lri}{$seen}{$pdi} מתוך {$lri}{$availableTotal}{$pdi} שאלות זמינות\n";
     if ($availableTotal > 0) {
         $msg .= $rlm . "   " . $bar($seen / $availableTotal) . "\n";
+    }
+
+    // Estimated exam grade (final exam = 40 Qs); needs a minimum sample to mean
+    // anything, otherwise nudge the user to answer more.
+    if ($examGrade !== null && $examWindow >= 10) {
+        $scope = $examWindow >= 40
+            ? "{$lri}40{$pdi} השאלות האחרונות"
+            : "{$lri}{$examWindow}{$pdi} התשובות שלך עד כה";
+        $msg .= $rlm . "🎓 ציון משוער בבחינה: {$lri}{$examGrade}{$pdi}  " . examGradeComment($examGrade) . "\n";
+        $msg .= $rlm . "   (לפי {$scope})\n";
+    } else {
+        $left = max(1, 10 - $examWindow);
+        $msg .= $rlm . "🎓 ציון משוער בבחינה: עוד {$lri}{$left}{$pdi} תשובות ונחשב\n";
     }
 
     // Streak (only worth showing once it's a real run)
