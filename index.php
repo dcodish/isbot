@@ -174,8 +174,7 @@ switch ($text) {
                 // Wrong answers in a row drop you to level 3; a correct answer
                 // offsets one. Remaining = how many consecutive wrongs from here.
                 $remaining = $currentRun - $downAt + 1;
-                if ($remaining < 1) { $remaining = 1; }
-                $msg .= $rlm . "🛡️ עוד {$lri}{$remaining}{$pdi} טעויות ברצף ותרד לרמה {$lri}3{$pdi}\n";
+                $msg .= $rlm . "🛡️ " . demotionRiskText($remaining) . "\n";
             }
             $msg .= "\n";
         } elseif ($upgradeAt !== null) {

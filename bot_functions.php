@@ -1327,6 +1327,21 @@ function showLeaderboardMonthly() {
 }
 
 /**
+ * Hebrew-correct "N more mistakes and you drop a level" line. Singular drops the
+ * number and the "in a row" qualifier ("עוד טעות אחת ותרד..."); plural keeps both
+ * ("עוד 3 טעויות ברצף ותרד..."). Number tokens are LRI-isolated for RTL.
+ * Used by both /level and the /stats card.
+ */
+function demotionRiskText($remaining) {
+    $lri = "\u{2066}"; $pdi = "\u{2069}";
+    $r = max(1, intval($remaining));
+    if ($r == 1) {
+        return "עוד טעות אחת ותרד לרמה {$lri}3{$pdi}";
+    }
+    return "עוד {$lri}{$r}{$pdi} טעויות ברצף ותרד לרמה {$lri}3{$pdi}";
+}
+
+/**
  * Render the player "stats card" — a single rich message that pulls together the
  * gamification picture (level + progress to next, points + leaderboard rank,
  * weekly standing, accuracy, current streak, badge collection) instead of the
@@ -1432,7 +1447,7 @@ function showStatsCard() {
         // Warn only once a wrong streak is actually building (current_run < 0).
         if ($level >= 4 && $downAt !== null && $currentRun < 0) {
             $remaining = max(1, $currentRun - $downAt + 1);
-            $msg .= $rlm . "   🛡️ עוד {$lri}{$remaining}{$pdi} טעויות ברצף ותרד לרמה {$lri}3{$pdi}\n";
+            $msg .= $rlm . "   🛡️ " . demotionRiskText($remaining) . "\n";
         }
     } else {
         $frac   = $upgradeAt > 0 ? $currentRun / $upgradeAt : 0;
