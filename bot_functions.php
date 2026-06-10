@@ -87,6 +87,9 @@ function showMainMenu($chat_id) {
             array('text' => '🎮 התחל לשחק', 'callback_data' => 'menu_start'),
         ),
         array(
+            array('text' => '📊 הסטטיסטיקות שלי', 'callback_data' => 'menu_stats'),
+        ),
+        array(
             array('text' => '🏅 אוסף התגים שלי', 'callback_data' => 'menu_badges'),
         ),
         array(

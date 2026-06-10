@@ -214,6 +214,11 @@ if (isset($update['callback_query'])) {
             showNextQ();
         } break;
 
+        case 'menu_stats': {
+            writeLog(5); // Stat — same action as /stats so the metric counts both entry points
+            showStatsCard();
+        } break;
+
 
         case 'menu_leaderboard': {
             writeLog(22); // MenuLeaderboardRoot
