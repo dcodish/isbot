@@ -1326,6 +1326,154 @@ function showLeaderboardMonthly() {
     bot_message($chat_id, $msg, $markup);
 }
 
+/**
+ * Render the player "stats card" — a single rich message that pulls together the
+ * gamification picture (level + progress to next, points + leaderboard rank,
+ * weekly standing, accuracy, current streak, badge collection) instead of the
+ * old three-line text dump. Replaces the inline /stats handler.
+ *
+ * RTL note: every line is RLM-prefixed; numeric tokens and the Unicode progress
+ * bars are wrapped in LRI…PDI isolates so digits and the ▰/▱ run keep their
+ * intended order inside an RTL paragraph (see CLAUDE.md "RTL rendering").
+ */
+function showStatsCard() {
+    global $db, $user_id, $chat_id;
+    $uid = intval($user_id);
+
+    // --- Core user row ---------------------------------------------------
+    $u = mysqli_fetch_assoc(mysqli_query($db,
+        "SELECT nickname, level, current_run, overall_points FROM users WHERE id = $uid"));
+    $nickname   = ($u && $u['nickname'] !== null && $u['nickname'] !== '') ? $u['nickname'] : 'משתתף';
+    $level      = $u ? intval($u['level']) : 1;
+    $currentRun = $u ? intval($u['current_run']) : 0;
+    $points     = $u ? intval($u['overall_points']) : 0;
+
+    // Next-level threshold for the current level (sentinel-large at the cap).
+    $upgradeAt = null;
+    $g = mysqli_query($db, "SELECT upgrade_at FROM gamification WHERE level = $level");
+    if ($g && mysqli_num_rows($g) > 0) {
+        $upgradeAt = intval(mysqli_fetch_assoc($g)['upgrade_at']);
+        mysqli_free_result($g);
+    }
+
+    // --- Accuracy + questions seen (user_q) ------------------------------
+    $aq = mysqli_fetch_assoc(mysqli_query($db,
+        "SELECT COUNT(*) AS seen, COALESCE(SUM(numofsuccess),0) AS ok, COALESCE(SUM(numoffailure),0) AS wrong
+         FROM user_q WHERE userid = $uid"));
+    $seen     = intval($aq['seen']);
+    $ok       = intval($aq['ok']);
+    $wrong    = intval($aq['wrong']);
+    $attempts = $ok + $wrong;
+    $accuracy = $attempts > 0 ? (int) round(100 * $ok / $attempts) : null;
+
+    // --- All-time rank (reuse the leaderboard's own eligibility/order) ----
+    $allEntries = fetchAllTimeEntries($db);
+    $allTotal   = count($allEntries);
+    $allRank    = null;
+    foreach ($allEntries as $i => $e) {
+        if ((string)$e['id'] === (string)$user_id) { $allRank = $i + 1; break; }
+    }
+
+    // --- Weekly points + rank (7-day rolling, same as weekly board) -------
+    $weekEntries = fetchRollingEntries($db, 7);
+    $weekRank = null; $weekPoints = 0;
+    foreach ($weekEntries as $i => $e) {
+        if ((string)$e['id'] === (string)$user_id) { $weekRank = $i + 1; $weekPoints = (int)$e['points']; break; }
+    }
+
+    // --- Current correct-answer streak (live counter in badge_progress) ---
+    $streak = 0;
+    $s = mysqli_query($db, "SELECT progress_value FROM badge_progress
+                            WHERE user_id = $uid AND badge_name = 'current_streak' LIMIT 1");
+    if ($s && mysqli_num_rows($s) > 0) {
+        $streak = intval(mysqli_fetch_assoc($s)['progress_value']);
+        mysqli_free_result($s);
+    }
+
+    // --- Badge collection: earned / total active + most recent ------------
+    $badgeEarned = intval(mysqli_fetch_assoc(mysqli_query($db,
+        "SELECT COUNT(*) AS c FROM user_badges WHERE user_id = $uid"))['c']);
+    $badgeTotal = intval(mysqli_fetch_assoc(mysqli_query($db,
+        "SELECT COUNT(*) AS c FROM badges WHERE is_active = 1"))['c']);
+    $lastBadge = null;
+    $lb = mysqli_query($db, "SELECT b.badge_emoji, b.badge_title_he
+                             FROM user_badges ub JOIN badges b ON ub.badge_id = b.badge_id
+                             WHERE ub.user_id = $uid ORDER BY ub.earned_at DESC LIMIT 1");
+    if ($lb && mysqli_num_rows($lb) > 0) {
+        $lastBadge = mysqli_fetch_assoc($lb);
+        mysqli_free_result($lb);
+    }
+
+    // --- Build message ----------------------------------------------------
+    $rlm = "\u{200F}"; $lri = "\u{2066}"; $pdi = "\u{2069}";
+    $bar = function ($frac, $w = 10) use ($lri, $pdi) {
+        $frac = max(0.0, min(1.0, (float)$frac));
+        $f = (int) round($frac * $w);
+        return $lri . str_repeat('▰', $f) . str_repeat('▱', $w - $f) . $pdi;
+    };
+
+    $msg  = $rlm . "📊 הכרטיס שלך — {$nickname}\n";
+    $msg .= $rlm . "━━━━━━━━━━━━━━\n";
+
+    // Level + progress to next
+    $msg .= $rlm . "🎯 רמה {$lri}{$level}{$pdi}\n";
+    if ($level >= 4 || $upgradeAt === null) {
+        $msg .= $rlm . "🏆 הגעת לרמה הגבוהה ביותר!\n";
+    } else {
+        $frac   = $upgradeAt > 0 ? $currentRun / $upgradeAt : 0;
+        $needed = max(0, $upgradeAt - $currentRun);
+        $next   = $level + 1;
+        $msg .= $rlm . "   " . $bar($frac) . "  {$lri}{$currentRun}/{$upgradeAt}{$pdi}\n";
+        $msg .= $rlm . "   עוד {$lri}{$needed}{$pdi} נכונות לרמה {$lri}{$next}{$pdi} 🚀\n";
+    }
+    $msg .= "\n";
+
+    // Points + all-time rank
+    $msg .= $rlm . "🏆 {$lri}{$points}{$pdi} נקודות";
+    if ($allRank !== null) {
+        $msg .= "  ·  מקום {$lri}{$allRank}{$pdi} מתוך {$lri}{$allTotal}{$pdi}";
+    }
+    $msg .= "\n";
+
+    // Weekly standing
+    if ($weekRank !== null) {
+        $msg .= $rlm . "📅 השבוע: {$lri}{$weekPoints}{$pdi} נק׳ · מקום {$lri}{$weekRank}{$pdi}\n";
+    } else {
+        $msg .= $rlm . "📅 השבוע: עדיין לא צברת נקודות — קדימה! 💪\n";
+    }
+    $msg .= "\n";
+
+    // Accuracy + exposure
+    if ($accuracy !== null) {
+        $msg .= $rlm . "✅ דיוק: {$lri}{$accuracy}%{$pdi}  " . $bar($accuracy / 100) . "\n";
+    } else {
+        $msg .= $rlm . "✅ דיוק: —\n";
+    }
+    $msg .= $rlm . "📝 נחשפת ל-{$lri}{$seen}{$pdi} שאלות\n";
+
+    // Streak (only worth showing once it's a real run)
+    if ($streak >= 2) {
+        $msg .= $rlm . "🔥 רצף נוכחי: {$lri}{$streak}{$pdi} נכונות ברצף\n";
+    }
+    $msg .= "\n";
+
+    // Badge collection
+    $msg .= $rlm . "🏅 תגים: {$lri}{$badgeEarned}/{$badgeTotal}{$pdi}\n";
+    if ($lastBadge) {
+        $msg .= $rlm . "   האחרון: {$lastBadge['badge_emoji']} {$lastBadge['badge_title_he']}\n";
+    }
+
+    $msg .= $rlm . "━━━━━━━━━━━━━━\n";
+    $msg .= $rlm . "💡 לאיפוס התקדמות: /clearstats (תגים ונקודות יישמרו)";
+
+    $keyboard = [
+        [['text' => '🏆 טבלאות מובילים', 'callback_data' => 'menu_leaderboard']],
+        [['text' => '🏅 אוסף התגים שלי', 'callback_data' => 'menu_badges']],
+        [['text' => '🎮 המשך לתרגל',     'callback_data' => 'menu_start']],
+    ];
+    bot_message($chat_id, $msg, ['inline_keyboard' => $keyboard]);
+}
+
 
 
 function recordAnswer($qid, $type){

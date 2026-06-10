@@ -109,33 +109,7 @@ switch ($text) {
 
     case '/stats' : {
         writeLog(5); // Stat
-        $safe_uid = intval($user_id);
-
-        $query = "SELECT COUNT(*) AS totalAnswered, COALESCE(SUM(numofsuccess),0) AS okCount, COALESCE(SUM(numoffailure),0) AS wrongCount FROM user_q WHERE userid = $safe_uid";
-        $result = mysqli_query($db, $query);
-        $row = mysqli_fetch_assoc($result);
-        $uniqueQuestionsSeen = intval($row['totalAnswered']);
-        $ok = intval($row['okCount']);
-        $wrong = intval($row['wrongCount']);
-        $totalAttempts = $ok + $wrong;
-
-        $rlm = "\u{200F}";
-        $lri = "\u{2066}"; $pdi = "\u{2069}";
-
-        $msg  = $rlm . "📊 הסטטיסטיקות שלך\n\n";
-        $msg .= $rlm . "📝 שאלות שנחשפת אליהן: {$lri}{$uniqueQuestionsSeen}{$pdi}\n";
-        if ($totalAttempts > 0) {
-            $percent = round(100 * $ok / $totalAttempts, 0);
-            $msg .= $rlm . "🎯 אחוז הצלחה: {$lri}{$percent}%{$pdi}\n";
-        } else {
-            $msg .= $rlm . "🎯 אחוז הצלחה: —\n";
-        }
-        $msg .= $rlm . "🆔 מספר משתמש בטלגרם: {$lri}{$safe_uid}{$pdi}\n\n";
-        $msg .= $rlm . "━━━━━━━━━━━━━━\n";
-        $msg .= $rlm . "💡 רוצה להתחיל מחדש? שלח /clearstats — ההיסטוריה תאופס (התגים והנקודות יישמרו).";
-
-        bot_message($chat_id, $msg);
-        showNextQ();
+        showStatsCard();
     } break;
 
     case '/clearstats' : {
