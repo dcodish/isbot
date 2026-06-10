@@ -1342,14 +1342,14 @@ function demotionRiskText($remaining) {
 }
 
 /**
- * Short qualitative comment for an estimated exam grade (Israeli scale, 60 = pass).
+ * Short qualitative comment for an estimated exam grade (Israeli scale, 56 = pass).
  */
 function examGradeComment($grade) {
     $g = intval($grade);
     if ($g >= 90) return "מצוין! 🌟";
     if ($g >= 80) return "טוב מאוד 👏";
     if ($g >= 70) return "טוב 👍";
-    if ($g >= 60) return "עובר — אפשר לשפר";
+    if ($g >= 56) return "עובר — אפשר לשפר";
     return "מתחת לעובר — בוא נתרגל עוד 💪";
 }
 
@@ -1514,17 +1514,12 @@ function showStatsCard() {
         $msg .= $rlm . "   " . $bar($seen / $availableTotal) . "\n";
     }
 
-    // Estimated exam grade (final exam = 40 Qs); needs a minimum sample to mean
-    // anything, otherwise nudge the user to answer more.
-    if ($examGrade !== null && $examWindow >= 10) {
-        $scope = $examWindow >= 40
-            ? "{$lri}40{$pdi} השאלות האחרונות"
-            : "{$lri}{$examWindow}{$pdi} התשובות שלך עד כה";
+    // Estimated exam grade (final exam = 40 Qs). Only shown once the user has a
+    // full 40-answer window — below that it isn't a meaningful exam proxy, so we
+    // simply omit it rather than show a partial estimate.
+    if ($examGrade !== null && $examWindow >= 40) {
         $msg .= $rlm . "🎓 ציון משוער בבחינה: {$lri}{$examGrade}{$pdi}  " . examGradeComment($examGrade) . "\n";
-        $msg .= $rlm . "   (לפי {$scope})\n";
-    } else {
-        $left = max(1, 10 - $examWindow);
-        $msg .= $rlm . "🎓 ציון משוער בבחינה: עוד {$lri}{$left}{$pdi} תשובות ונחשב\n";
+        $msg .= $rlm . "   (לפי {$lri}40{$pdi} השאלות האחרונות)\n";
     }
 
     // Streak (only worth showing once it's a real run)
