@@ -136,7 +136,7 @@ on gamified learning.
 
 ### 3.9 Exam Mode (FR-EXM)
 - **FR-EXM-1** *(built)* — A student-facing **practice exam**, started by the
-  **`/מבחן` command** (English alias `/exam`) or the **📝 מבחן תרגול** menu
+  **`/exam-mode` command** (alias `/exam`) or the **📝 מבחן תרגול** menu
   button: 10 questions pulled live from the bank, **stratified** across lectures
   (`max_lecture ≤ current_week`) and success-rate levels, under a **20-minute**
   timer with auto-submit at expiry. Grade is 0–100 (10 pts/question); pass = 56.

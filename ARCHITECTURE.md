@@ -45,7 +45,7 @@ Progression controlled by the `current_run` counter in the `users` table vs. per
 **Lecture filter.** Every selection query is gated by `(max_lecture IS NULL OR max_lecture <= $current_week)` where `$current_week` comes from `settings.current_week`. NULL means "always visible". Students see only material covered in lectures 1..current_week.
 
 ### Exam Mode (student-facing practice exam)
-A self-assessment mode in [`exam_functions.php`](exam_functions.php) (required from `bot_functions.php`, so every entrypoint gets it). Entered via the `/מבחן` / `/exam` command (routed in `index.php`) or the **📝 מבחן תרגול** menu button / stats-card link (`menu_exam`). `showExamIntro()` explains the rules; `exam_start` calls `startExam()`.
+A self-assessment mode in [`exam_functions.php`](exam_functions.php) (required from `bot_functions.php`, so every entrypoint gets it). Entered via the `/exam-mode` / `/exam` command (routed in `index.php`) or the **📝 מבחן תרגול** menu button / stats-card link (`menu_exam`). `showExamIntro()` explains the rules; `exam_start` calls `startExam()`.
 
 **Selection (`selectExamQuestions()`).** Pulls `settings.exam_num_questions` (default 10) questions stratified across lectures (`max_lecture ≤ getCurrentWeek()`) and live success-rate levels (the same bands as `getQuestion()`, computed in SQL; probation = `numofanswers < 5`). A **breadth pass** guarantees one question per lecture before any lecture gets a second; a density-weighted **fill pass** then favours denser lectures, and within both a least-represented-level preference keeps the set from being all-easy/all-hard. Questions with `reportedbad > 2` are excluded; no repeats within an attempt.
 
@@ -53,7 +53,7 @@ A self-assessment mode in [`exam_functions.php`](exam_functions.php) (required f
 
 **Stop = discard the grade, not the activity.** `exam_cancel` → confirm → `cancelExam()` logs `ExamStopped` **before** deleting the `exam_attempts` row (cascade clears its question rows), so no graded result is kept — but the audit trail records the stop and the per-answer practice writes already made stay. See design.md ADR-012.
 
-**Staged rollout.** The menu button is visible to everyone, but `examFeatureEnabled()` gates the actual flow: while `settings.exam_enabled_for_all = '0'`, only members of the staff cohort (`settings.exam_staff_cohort_id`, the "צוות" group) get the real exam; everyone else sees a "🚧 בפיתוח" notice. Open it to all with a one-row settings flip — no deploy. Add a tester by assigning their user to the staff cohort.
+**Rollout gate.** `examFeatureEnabled()` gates the flow: with `settings.exam_enabled_for_all = '1'` (the GA state) everyone gets it; set it to `'0'` to restrict to the staff cohort (`settings.exam_staff_cohort_id`, the "צוות" group) — non-staff then see a "🚧 בפיתוח" notice. The switch is data-only (no deploy); it was used to dev-test with staff before GA.
 
 **Feedback views.** The results screen shows grade, pass/fail, per-lecture breakdown, and the latest-3 average. `menu_exam_results` (`showExamHistory()`) shows the **grade-over-time trend** (a unicode bar chart — no Imagick), the latest-3 average, and a **per-lecture strength** table (weakest first) aggregated across attempts. Retakes are unlimited and re-select fresh questions. New `settings`: `exam_num_questions`, `exam_time_minutes`, `exam_pass_grade`. New `log` actions: 36 `ExamStart`, 37 `ExamCompleted`, 38 `ExamStopped` (`additional_value` = attempt id). Spec: [docs/features/exam-mode.md](docs/features/exam-mode.md) (FR-EXM-*).
 

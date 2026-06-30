@@ -205,11 +205,10 @@ A short, timed, stratified self-assessment inside the bot (FR-EXM-*). Full spec:
   the per-lecture history (FR-EXM-4) stays correct even if a question is later
   re-tagged. The aggregate is *what lecture this counted toward at exam time*, not
   the question's current tag.
-- **Start via a `/מבחן` command + a menu button**, mirroring the existing
-  dual-alias text commands (`/menu`+`/תפריט`) routed in `index.php`. Hebrew slash
-  commands can't be registered in BotFather's menu (ASCII-only) but still arrive
-  as message text, so the `switch ($text)` match works; the English `/exam` alias
-  covers the menu listing.
+- **Start via the `/exam-mode` command (alias `/exam`) + a menu button**, routed
+  in `index.php`'s `switch ($text)` alongside the menu-button path (`menu_exam`).
+  English command (originally shipped as the Hebrew `/מבחן`, renamed at GA so all
+  slash commands read in English).
 - **Stop = discard the grade, not the activity (FR-EXM-6/7).** Two ledgers are
   kept deliberately separate: the student's **personal exam stats** and the **`log`
   audit table**. Quitting mid-exam **deletes** the `exam_attempts` row and its

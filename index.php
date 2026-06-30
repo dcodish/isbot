@@ -112,8 +112,8 @@ switch ($text) {
         showStatsCard();
     } break;
 
-    case '/exam':
-    case '/מבחן': {
+    case '/exam-mode':
+    case '/exam': {
         // Exam-mode entry point (text-command path); menu_exam is the button path.
         showExamIntro($chat_id);
     } break;

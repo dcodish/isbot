@@ -221,7 +221,7 @@ if (isset($update['callback_query'])) {
 
 
         case 'menu_exam': {
-            // Exam-mode intro (button path); /מבחן is the command path.
+            // Exam-mode intro (button path); /exam-mode is the command path.
             showExamIntro($chat_id);
         } break;
 

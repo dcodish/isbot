@@ -36,27 +36,26 @@ targeted.
 | Feedback timing | **Immediate, per question** | Right/wrong shown after each answer (like practice) rather than a silent 10-then-grade flow — reviewing a batch of past questions after the fact is awkward in Telegram. A final results screen still gives the grade. |
 | Session cleanup | **Keep the existing erase mechanism** | Exam question messages are logged to `session_question_messages` and cleaned by `maybeStartNewSession()` exactly like practice questions (FR-SES-1 / ADR-005). |
 | Retakes | **Unlimited, fresh each time** | Each attempt re-selects questions. No repeats *within* an attempt; repeats *across* attempts are allowed (the bank may be small). |
-| Start entry points | **`/מבחן` command + menu button** | A Hebrew slash command `/מבחן` (English alias `/exam`) routed in `index.php`'s `switch ($text)` — same dual-alias pattern as `/menu`+`/תפריט`, `/semester`+`/סמסטר` — **and** the **📝 מבחן תרגול** main-menu button. Both land on the intro screen. |
+| Start entry points | **`/exam-mode` command + menu button** | The `/exam-mode` slash command (alias `/exam`) routed in `index.php`'s `switch ($text)` **and** the **📝 מבחן תרגול** main-menu button. Both land on the intro screen. (Originally shipped as the Hebrew `/מבחן`; renamed at GA so all slash commands read in English.) |
 | Stop / abandon | **"הפסק מבחן" button — no grade, no logged result** | The student can quit mid-exam. The attempt is **not graded and not recorded** (no grade, no history/graph/per-lecture entry). The questions they already answered **still count** as normal practice (points/level/badges/question stats already written by `recordAnswer()` per answer — those stay). |
 | Grade scale | **0–100, pass = 56** | 10 questions × 10 pts; 6 correct = 60 (pass), 5 = 50 (fail). Matches the existing exam-grade convention (stats card, FR-GAM-5). Tunable via `settings.exam_pass_grade`. |
 | Tracking | **Persisted per attempt + per question** | Enables the grade-over-time graph, the latest-3 average, and the per-lecture strength breakdown. |
 
-## Staged rollout (gate)
+## Rollout gate
 
-The feature ships **gated to the staff cohort** while in development. The main-menu
-button is shown to everyone, but tapping it (or `/מבחן`) runs `examFeatureEnabled()`:
-- `settings.exam_enabled_for_all = '1'` → everyone gets it (the GA switch).
-- otherwise → only users whose `cohort_id = settings.exam_staff_cohort_id` (the
-  "צוות" cohort, id 3 on prod) get the real flow; everyone else sees a
-  "🚧 בפיתוח — בקרוב" notice.
+`examFeatureEnabled()` controls who gets the flow (the main-menu button is shown to
+everyone regardless):
+- `settings.exam_enabled_for_all = '1'` → **everyone** (the current GA state).
+- `= '0'` → only users whose `cohort_id = settings.exam_staff_cohort_id` (the
+  "צוות" cohort, id 3 on prod); everyone else sees a "🚧 בפיתוח — בקרוב" notice.
 
-Both are `settings` rows, so opening to all (or adding a tester to the staff
-cohort) needs no deploy. Gate is enforced at `showExamIntro()`, `startExam()`, and
-`showExamHistory()`.
+Both are `settings` rows, so toggling GA (or adding a tester to the staff cohort)
+needs no deploy. The gate was used to dev-test with staff before GA, and is
+enforced at `showExamIntro()`, `startExam()`, and `showExamHistory()`.
 
 ## Flow (student's perspective)
 
-1. **`/מבחן`** (or `/exam`), or main menu → **📝 מבחן תרגול** (`menu_exam`) →
+1. **`/exam-mode`** (or `/exam`), or main menu → **📝 מבחן תרגול** (`menu_exam`) →
    intro screen: "10 שאלות, 20 דקות, נספר לנקודות שלך" + **התחל מבחן** button
    (`exam_start`).
 2. On start: select 10 stratified questions, create an `exam_attempts` row
@@ -106,7 +105,7 @@ gets **three new event types** so the full exam lifecycle is in the research tra
 
 | `action_id` | name | logged when | `additional_value` |
 | --- | --- | --- | --- |
-| 36 | `ExamStart` | an attempt is created (`/מבחן` / `exam_start`) | `attempt_id` |
+| 36 | `ExamStart` | an attempt is created (`/exam-mode` / `exam_start`) | `attempt_id` |
 | 37 | `ExamCompleted` | all questions answered **or** timer expired → graded | `attempt_id` |
 | 38 | `ExamStopped` | user confirms "הפסק מבחן" (before the row is deleted) | `attempt_id` |
 
@@ -222,7 +221,7 @@ check on the answer hot path; cleared at finalize.
    checks.
 
 4. **Routing**
-   - **`index.php` `switch ($text)`** — add `case '/exam':` / `case '/מבחן':`
+   - **`index.php` `switch ($text)`** — add `case '/exam':` / `case '/exam-mode':`
      (dual-alias, like `/menu`+`/תפריט`) → the exam intro. Respect the nickname
      and cohort gates already enforced ahead of the switch.
    - **`variable_setup.php` callback switch** — new callbacks: `menu_exam`
@@ -265,7 +264,7 @@ check on the answer hot path; cleared at finalize.
 
 1. Migration (the two tables + `active_exam_attempt_id` + settings rows).
 2. `selectExamQuestions()` + a `tools/` smoke script to eyeball a sample exam.
-3. Exam lifecycle + routing (start via `/מבחן` + `menu_exam`, serve →
+3. Exam lifecycle + routing (start via `/exam-mode` + `menu_exam`, serve →
    answer+feedback → finalize; **plus the `exam_cancel` confirm→discard path**),
    reusing `recordAnswer()` and `logSessionQuestionMessage()`.
 4. Results screen (per-attempt) — get a full attempt working end to end.

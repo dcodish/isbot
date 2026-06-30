@@ -238,7 +238,7 @@ function examActiveAttemptId($user_id) {
 
 /* ------------------------------------------------------------------- start   */
 
-/** Intro screen (from /מבחן, /exam, or the menu button). */
+/** Intro screen (from /exam-mode, /exam, or the menu button). */
 function showExamIntro($chat_id) {
     global $user_id;
     if (!examFeatureEnabled($user_id)) { examUnderDevelopmentNotice($chat_id); return; }
