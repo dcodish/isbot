@@ -258,7 +258,7 @@ function showExamIntro($chat_id) {
     $msg .= $rlm . "תוכלו להפסיק בכל שלב אבל אז לא יירשם לכם ציון";
 
     $markup = ['inline_keyboard' => [
-        [['text' => '▶️ התחל מבחן', 'callback_data' => 'exam_start']],
+        [['text' => '▶️ התחילו מבחן', 'callback_data' => 'exam_start']],
         [['text' => '📈 התוצאות שלי במבחנים', 'callback_data' => 'menu_exam_results']],
         [['text' => '⬅️ חזרה לתפריט', 'callback_data' => 'menu_back']],
     ]];
@@ -623,10 +623,10 @@ function showExamHistory() {
 
     if ($count === 0) {
         $markup = ['inline_keyboard' => [
-            [['text' => '▶️ התחל מבחן', 'callback_data' => 'exam_start']],
+            [['text' => '▶️ התחילו מבחן', 'callback_data' => 'exam_start']],
             [['text' => '⬅️ חזרה לתפריט', 'callback_data' => 'menu_back']],
         ]];
-        bot_message($chat_id, $rlm . "📈 עדיין לא עשית מבחן תרגול.\n" . $rlm . "התחל מבחן כדי לראות כאן את ההתקדמות שלך.", $markup);
+        bot_message($chat_id, $rlm . "📈 עדיין לא עשית מבחן תרגול.\n" . $rlm . "התחילו מבחן כדי לראות כאן את ההתקדמות שלך.", $markup);
         return;
     }
 
