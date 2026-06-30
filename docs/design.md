@@ -177,6 +177,56 @@ is the intended "stay sharp at the top" pressure, and the correct-offset keeps
 isolated mistakes harmless. Migration:
 `migrations/2026-06-10_l4_downgrade_threshold.sql`.
 
+### ADR-012 — Student-facing practice exam mode · *accepted, built*
+A short, timed, stratified self-assessment inside the bot (FR-EXM-*). Full spec:
+[features/exam-mode.md](features/exam-mode.md). The decisions worth recording:
+
+- **10 questions, not 40.** The real final exam is 40; this is *practice*, so it's
+  deliberately short and repeatable. Length/timer/pass are `settings` knobs, not
+  constants (NFR-6), so 40-question "full mock" runs are a config change, not code.
+- **Counts as normal practice** (routed through `recordAnswer()`) rather than a
+  sandboxed run. **Trade-off:** the simplest, most consistent path — points,
+  badges, and leveling all "just work" and exam answers improve the bank's
+  success-rate signal — but a hard exam *can* demote a player (and inflates the
+  leaderboard). Chosen knowingly: the alternative (a parallel, isolated answer
+  path) duplicates `recordAnswer()` and risks diverging from the L4-cap invariant
+  (ADR-011). If exam-driven demotion proves unpopular, isolating *just* the
+  leveling side is a smaller follow-up than building a separate path now.
+- **Immediate per-question feedback**, not silent-then-grade. Reviewing a batch of
+  past questions after the fact is awkward in Telegram's linear chat, and the
+  session-erase mechanism (ADR-005) may already have wiped earlier stems by the
+  time results show. Immediate ✓/✗ keeps the learning loop tight; the final
+  screen still gives the grade and per-lecture breakdown.
+- **Lazy, interaction-driven timer.** The prod webhook has no background process
+  to fire a countdown (ADR-001), so expiry is evaluated when the next interaction
+  arrives, and dangling `in_progress` attempts are auto-finalized when a new exam
+  starts. A pushed "time's up" message would need a scheduled job — deferred.
+- **Snapshot `max_lecture` per answered question** in `exam_attempt_questions`, so
+  the per-lecture history (FR-EXM-4) stays correct even if a question is later
+  re-tagged. The aggregate is *what lecture this counted toward at exam time*, not
+  the question's current tag.
+- **Start via a `/מבחן` command + a menu button**, mirroring the existing
+  dual-alias text commands (`/menu`+`/תפריט`) routed in `index.php`. Hebrew slash
+  commands can't be registered in BotFather's menu (ASCII-only) but still arrive
+  as message text, so the `switch ($text)` match works; the English `/exam` alias
+  covers the menu listing.
+- **Stop = discard the grade, not the activity (FR-EXM-6/7).** Two ledgers are
+  kept deliberately separate: the student's **personal exam stats** and the **`log`
+  audit table**. Quitting mid-exam **deletes** the `exam_attempts` row and its
+  per-question rows so no partial/zero grade pollutes the trend graph or
+  per-lecture stats (an abandoned run isn't a real performance signal) — but the
+  `log` table still gets an `ExamStopped` event, so the research trail (FR-RES-2)
+  "tracks all activity." The answers already counted as practice stay (incl. their
+  `CorrectAnswer`/`WrongAnswer` log rows), because `recordAnswer()` fires per
+  answer, independently of the exam record. Quit-rate is therefore still
+  measurable from the `ExamStart`−`ExamCompleted` gap without keeping an
+  `abandoned` stats row.
+- **Exam lifecycle is fully audited.** Three new `log` action types — `ExamStart`
+  (36), `ExamCompleted` (37), `ExamStopped` (38), `additional_value = attempt_id` —
+  seeded `INSERT IGNORE` like `migrations/2026-04-20_log_actions_expansion.sql`.
+  In-exam answers reuse `CorrectAnswer`/`WrongAnswer` so existing answer analytics
+  and badge/level logic need no exam special-case.
+
 ---
 
 ## Open / deferred

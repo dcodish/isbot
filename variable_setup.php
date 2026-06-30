@@ -220,6 +220,38 @@ if (isset($update['callback_query'])) {
         } break;
 
 
+        case 'menu_exam': {
+            // Exam-mode intro (button path); /מבחן is the command path.
+            showExamIntro($chat_id);
+        } break;
+
+        case 'menu_exam_results': {
+            showExamHistory();
+        } break;
+
+        case 'exam_start': {
+            startExam();
+        } break;
+
+        case 'EXQ': {
+            // EXQ:attempt:qid:chosen:correct — an exam answer.
+            handleExamAnswer($pieces[1] ?? 0, $pieces[2] ?? 0, $pieces[3] ?? 0, $pieces[4] ?? 0);
+        } break;
+
+        case 'exam_cancel': {
+            showExamCancelConfirm($chat_id);
+        } break;
+
+        case 'exam_cancel_confirm': {
+            cancelExam(examActiveAttemptId($user_id));
+        } break;
+
+        case 'exam_cancel_dismiss': {
+            // Resume: re-serve the current question of the active attempt.
+            $aid = examActiveAttemptId($user_id);
+            if ($aid > 0) { serveExamQuestion($aid); } else { showExamIntro($chat_id); }
+        } break;
+
         case 'menu_leaderboard': {
             writeLog(22); // MenuLeaderboardRoot
             showLeaderboardMenu();

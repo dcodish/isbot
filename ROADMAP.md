@@ -209,7 +209,9 @@ Not committed to, but worth revisiting:
 - **Streak freeze / lifeline** — let students "bank" a streak-save token
 - **Group/team challenges** — class-wide challenge mode with shared progress
 - **Notification reminders** — Telegram DM to inactive users ("haven't practiced in 3 days")
-- **Exam mode** — timed session with fixed question count and no hints
+- **Exam mode** — student-facing timed practice exam (10 Q, 20 min, stratified,
+  graded, per-lecture feedback). **Now specced** → [docs/features/exam-mode.md](docs/features/exam-mode.md)
+  (FR-EXM-*, ADR-012); ready to build.
 - **Question generation from lecture slides** — AI-assisted authoring for thin lectures (the question-writer agent already does this interactively; automate as a batch?)
 - **Calendar-aligned leaderboards** — switch from rolling 7/30-day windows to calendar weeks/months. `WHERE`-clause change in `fetchRollingEntries()`. See [ARCHITECTURE.md § Leaderboards](ARCHITECTURE.md#leaderboards).
 - **Leagues** (cohorts of ~20 users) — if user base grows past ~50, global leaderboards become noise. Cohort-based leagues à la Duolingo would keep competition proximal.

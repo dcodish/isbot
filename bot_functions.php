@@ -87,6 +87,9 @@ function showMainMenu($chat_id) {
             array('text' => '🎮 התחל לשחק', 'callback_data' => 'menu_start'),
         ),
         array(
+            array('text' => '📝 מבחן תרגול', 'callback_data' => 'menu_exam'),
+        ),
+        array(
             array('text' => '📊 הסטטיסטיקות שלי', 'callback_data' => 'menu_stats'),
         ),
         array(
@@ -1541,6 +1544,7 @@ function showStatsCard() {
     $msg .= $rlm . "💡 לאיפוס התקדמות: /clearstats (תגים ונקודות יישמרו)";
 
     $keyboard = [
+        [['text' => '📝 מבחן תרגול',     'callback_data' => 'menu_exam']],
         [['text' => '🏆 טבלאות מובילים', 'callback_data' => 'menu_leaderboard']],
         [['text' => '🏅 אוסף התגים שלי', 'callback_data' => 'menu_badges']],
         [['text' => '🎮 המשך לתרגל',     'callback_data' => 'menu_start']],
@@ -1731,6 +1735,41 @@ function recordAnswer($qid, $type){
 
     // Default return if no badge checks needed
     return null;
+}
+
+/**
+ * Run the post-answer badge checks for a recordAnswer() return flag. Extracted so
+ * the exam-mode answer path (exam_functions.php) reuses the exact same logic as
+ * the practice 'Q' handler in variable_setup.php. Call AFTER the answer-feedback
+ * message has been sent.
+ */
+function runAnswerBadgeChecks($badgeCheck) {
+    global $db, $user_id, $chat_id;
+
+    if ($badgeCheck === 'check_correct_badges') {
+        $badgeService = new BadgeService($db, $user_id, $chat_id);
+        $badgeService->checkCorrectAnswerBadges();
+
+        // Also check level badges if the user just leveled up (current_run == 0).
+        $levelResult = mysqli_query($db, "SELECT level FROM users WHERE id = " . intval($user_id));
+        if ($levelResult && mysqli_num_rows($levelResult) > 0) {
+            $currentLevel = mysqli_fetch_assoc($levelResult)['level'];
+            mysqli_free_result($levelResult);
+
+            $runResult = mysqli_query($db, "SELECT current_run FROM users WHERE id = " . intval($user_id));
+            if ($runResult && mysqli_num_rows($runResult) > 0) {
+                $runRow = mysqli_fetch_assoc($runResult);
+                if ($runRow['current_run'] == 0) {
+                    $badgeService->checkLevelBadge($currentLevel);
+                    $badgeService->checkComebackBadge();
+                }
+                mysqli_free_result($runResult);
+            }
+        }
+    } elseif ($badgeCheck === 'check_wrong_badges') {
+        $badgeService = new BadgeService($db, $user_id, $chat_id);
+        $badgeService->checkWrongAnswerBadges();
+    }
 }
 
 function GetQsoFar() {
@@ -1992,4 +2031,8 @@ function checkNicknameRequired($user_id, $chat_id) {
 
     return false; // User needs to set nickname
 }
+
+// Student-facing Exam Mode lives in its own file; loaded here so every entrypoint
+// that requires bot_functions.php (index.php, variable_setup.php, tools/*) gets it.
+require_once __DIR__ . '/exam_functions.php';
 

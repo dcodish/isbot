@@ -112,6 +112,12 @@ switch ($text) {
         showStatsCard();
     } break;
 
+    case '/exam':
+    case '/מבחן': {
+        // Exam-mode entry point (text-command path); menu_exam is the button path.
+        showExamIntro($chat_id);
+    } break;
+
     case '/clearstats' : {
         writeLog(31); // ClearStatsRequest
         // Show confirmation prompt rather than acting immediately — destructive action.

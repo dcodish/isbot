@@ -134,6 +134,44 @@ on gamified learning.
   `difficulty = 1`; the bot reclassifies from answer success-rate.
 - **FR-TOOL-2** *(built)* — Filtered exam exports (BGU, Sami) under `tools/`.
 
+### 3.9 Exam Mode (FR-EXM)
+- **FR-EXM-1** *(built)* — A student-facing **practice exam**, started by the
+  **`/מבחן` command** (English alias `/exam`) or the **📝 מבחן תרגול** menu
+  button: 10 questions pulled live from the bank, **stratified** across lectures
+  (`max_lecture ≤ current_week`) and success-rate levels, under a **20-minute**
+  timer with auto-submit at expiry. Grade is 0–100 (10 pts/question); pass = 56.
+  Counts and timer length are `settings` knobs (`exam_num_questions`,
+  `exam_time_minutes`, `exam_pass_grade`). See
+  [features/exam-mode.md](features/exam-mode.md).
+- **FR-EXM-2** *(built)* — Exam answers **count as normal practice**: routed
+  through `recordAnswer()` so points, leveling (incl. the L4 cap, FR-GAM-1), and
+  badges all apply. Exam question messages are logged and session-cleaned exactly
+  like practice questions (FR-SES-1). Feedback is **immediate per question**
+  (✓/✗ + correct answer), with a final results screen.
+- **FR-EXM-3** *(built)* — Each attempt and every answered question is
+  persisted (`exam_attempts` / `exam_attempt_questions`, with a snapshot of each
+  question's `max_lecture`) so grades and per-lecture performance survive later
+  re-tagging.
+- **FR-EXM-4** *(built)* — Student feedback views: a **grade-over-time graph**,
+  the **average of the latest 3 attempts**, and a **per-lecture strength
+  breakdown** (weakest first) so revision can be targeted.
+- **FR-EXM-5** *(built)* — **Unlimited retakes**, fresh question selection each
+  attempt (no repeats within an attempt). Dangling `in_progress` attempts are
+  finalized defensively (lazy expiry on the timer; auto-expired when a new exam
+  starts), since the webhook runtime has no background clock.
+- **FR-EXM-6** *(built)* — A **"הפסק מבחן" (stop)** control lets the student
+  abandon an exam mid-way (behind a confirm). No **graded result** is kept — the
+  attempt leaves no trace in the student's grade history, graph, latest-3 average,
+  or per-lecture stats — but the answers already given **still count** as normal
+  practice (the per-answer `recordAnswer()` writes are not rolled back, FR-EXM-2).
+- **FR-EXM-7** *(built)* — The full exam lifecycle is recorded in the **`log`
+  audit table** for research (FR-RES-2), independent of the personal-stats record:
+  new events `ExamStart` (36), `ExamCompleted` (37, on finish **or** timer
+  expiry), `ExamStopped` (38, on abandon — logged before the attempt is deleted),
+  each with the `attempt_id` in `additional_value`. Per-answer events keep the
+  existing `CorrectAnswer`/`WrongAnswer` codes (exam answers are practice
+  answers). "Stop" suppresses the *grade*, not the *activity trail*.
+
 ---
 
 ## 4. Non-Functional Requirements (NFR)

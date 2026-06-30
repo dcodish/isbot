@@ -44,6 +44,19 @@ Progression controlled by the `current_run` counter in the `users` table vs. per
 
 **Lecture filter.** Every selection query is gated by `(max_lecture IS NULL OR max_lecture <= $current_week)` where `$current_week` comes from `settings.current_week`. NULL means "always visible". Students see only material covered in lectures 1..current_week.
 
+### Exam Mode (student-facing practice exam)
+A self-assessment mode in [`exam_functions.php`](exam_functions.php) (required from `bot_functions.php`, so every entrypoint gets it). Entered via the `/מבחן` / `/exam` command (routed in `index.php`) or the **📝 מבחן תרגול** menu button / stats-card link (`menu_exam`). `showExamIntro()` explains the rules; `exam_start` calls `startExam()`.
+
+**Selection (`selectExamQuestions()`).** Pulls `settings.exam_num_questions` (default 10) questions stratified across lectures (`max_lecture ≤ getCurrentWeek()`) and live success-rate levels (the same bands as `getQuestion()`, computed in SQL; probation = `numofanswers < 5`). A **breadth pass** guarantees one question per lecture before any lecture gets a second; a density-weighted **fill pass** then favours denser lectures, and within both a least-represented-level preference keeps the set from being all-easy/all-hard. Questions with `reportedbad > 2` are excluded; no repeats within an attempt.
+
+**Lifecycle.** `startExam()` drops any dangling in-progress attempt (silently — its absent `ExamCompleted` marks abandonment), inserts an `exam_attempts` row + one `exam_attempt_questions` row per question (snapshotting `max_lecture` and the correct option **text**), sets `users.active_exam_attempt_id`, logs `ExamStart`, and serves Q1. `serveExamQuestion()` renders one question with a remaining-time header (lazy timer — webhook has no clock; expiry is evaluated on each interaction), shuffles options, and carries `EXQ:<attempt>:<qid>:<chosen>:<correct>` callbacks plus a **🛑 הפסק מבחן** button; every message is logged via `logSessionQuestionMessage()` so session cleanup (FR-SES-1) still covers exam questions. `handleExamAnswer()` records the answer, `writeLog()`s `CorrectAnswer`/`WrongAnswer`, then routes through **`recordAnswer()`** so points/leveling/badges apply exactly like practice (badge checks via the shared `runAnswerBadgeChecks()`), shows immediate ✓/✗ feedback, and serves the next. `finalizeExam()` grades (`num_correct / num_questions × 100`, pass = `settings.exam_pass_grade` = 56; unanswered-at-expiry count wrong), logs `ExamCompleted`, and shows the results screen.
+
+**Stop = discard the grade, not the activity.** `exam_cancel` → confirm → `cancelExam()` logs `ExamStopped` **before** deleting the `exam_attempts` row (cascade clears its question rows), so no graded result is kept — but the audit trail records the stop and the per-answer practice writes already made stay. See design.md ADR-012.
+
+**Staged rollout.** The menu button is visible to everyone, but `examFeatureEnabled()` gates the actual flow: while `settings.exam_enabled_for_all = '0'`, only members of the staff cohort (`settings.exam_staff_cohort_id`, the "צוות" group) get the real exam; everyone else sees a "🚧 בפיתוח" notice. Open it to all with a one-row settings flip — no deploy. Add a tester by assigning their user to the staff cohort.
+
+**Feedback views.** The results screen shows grade, pass/fail, per-lecture breakdown, and the latest-3 average. `menu_exam_results` (`showExamHistory()`) shows the **grade-over-time trend** (a unicode bar chart — no Imagick), the latest-3 average, and a **per-lecture strength** table (weakest first) aggregated across attempts. Retakes are unlimited and re-select fresh questions. New `settings`: `exam_num_questions`, `exam_time_minutes`, `exam_pass_grade`. New `log` actions: 36 `ExamStart`, 37 `ExamCompleted`, 38 `ExamStopped` (`additional_value` = attempt id). Spec: [docs/features/exam-mode.md](docs/features/exam-mode.md) (FR-EXM-*).
+
 ### Points System
 Points awarded per answer based on question difficulty inferred from success rate. Rules stored in `point_rules` table (action_type × question_level → points). All transactions logged in `point_log`, including badge bonus rewards (stored with `question_id IS NULL`).
 
@@ -144,6 +157,8 @@ Session-authenticated web UI for question CRUD. Credentials from `.env`. Questio
 | `survey_questions` / `user_survey` | Optional research survey interleaved with quiz |
 | `processed_updates` | Deduplication of Telegram update_ids |
 | `session_question_messages` | Per-user log of sent question message_ids for session-boundary cleanup |
+| `exam_attempts` | One row per practice-exam attempt: status, num_questions, num_correct, grade, time limit, timestamps |
+| `exam_attempt_questions` | Per-question rows of an attempt: position, snapshot `max_lecture`, correct-answer text, chosen answer, is_correct |
 | `settings` | Key/value store for tunable parameters (`current_week`, `session_gap_minutes`, …) |
 | `actions` | Action-type lookup (CorrectAnswer, WrongAnswer, Skip, etc.) |
 | `log` | General action audit log |
@@ -155,7 +170,8 @@ Handled in `variable_setup.php`. Key formats:
 - `SQ:ID:A:*` — answer a survey question
 - `Bad:ID` — report question as unclear
 - `skip` / `skipSQ:ID` — skip question
-- `menu_*` — navigate main menu
+- `menu_*` — navigate main menu (`menu_exam` opens the exam intro, `menu_exam_results` the history view)
+- `EXQ:attempt:qid:chosen:correct` — answer an exam question; `exam_start` / `exam_cancel` (+ `exam_cancel_confirm` / `exam_cancel_dismiss`) drive the exam lifecycle
 
 ## Tools & Export Scripts
 
@@ -165,6 +181,7 @@ Located under `tools/` — see [tools/README.md](tools/README.md).
 - `tools/insert_questions.php` — Prepared-statement batch insert from a JSON file; used by the question-writer subagent
 - `tools/export.php` — HTML table view of question bank
 - `tools/exportforexam*.php` — Institution-specific filtered exports (BGU, Sami)
+- `tools/exam_sample.php` — Smoke test: prints a sample stratified exam (lecture/level spread) without Telegram or DB writes
 
 One-off DB changes live in `migrations/YYYY-MM-DD_description.sql`. Apply via `scp` + `mysql < file` on prod. All migrations are idempotent (`IF NOT EXISTS`, `ON DUPLICATE KEY UPDATE`) so re-running is safe.
 
