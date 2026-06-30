@@ -112,9 +112,12 @@ switch ($text) {
         showStatsCard();
     } break;
 
+    case '/exam_mode':
     case '/exam-mode':
     case '/exam': {
         // Exam-mode entry point (text-command path); menu_exam is the button path.
+        // /exam_mode is the BotFather-registrable form (no hyphen); the others are
+        // typed-only aliases.
         showExamIntro($chat_id);
     } break;
 
