@@ -255,7 +255,7 @@ function showExamIntro($chat_id) {
     $msg .= $rlm . "• ציון עובר: " . examIso($pass) . "\n";
     $msg .= $rlm . "• תקבל משוב על כל שאלה, וציון בסוף\n";
     $msg .= $rlm . "• השאלות נספרות לנקודות ולסטטיסטיקה שלך (כמו תרגול רגיל)\n\n";
-    $msg .= $rlm . "אפשר להפסיק באמצע — אז לא יירשם ציון.";
+    $msg .= $rlm . "תוכלו להפסיק בכל שלב אבל אז לא יירשם לכם ציון";
 
     $markup = ['inline_keyboard' => [
         [['text' => '▶️ התחל מבחן', 'callback_data' => 'exam_start']],
