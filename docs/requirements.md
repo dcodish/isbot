@@ -171,6 +171,16 @@ on gamified learning.
   each with the `attempt_id` in `additional_value`. Per-answer events keep the
   existing `CorrectAnswer`/`WrongAnswer` codes (exam answers are practice
   answers). "Stop" suppresses the *grade*, not the *activity trail*.
+- **FR-EXM-8** *(built)* — An **instructor-facing exam-usage dashboard**
+  (`admin/exam.php`, read-only) surfaces how the feature is used over a lookback
+  window: adoption (started attempts, distinct students, % of active students),
+  the start→finish **funnel** (finished vs. stopped vs. abandoned, reconstructed
+  from `log` 36/37/38 by `additional_value = attempt_id`, since stopped/abandoned
+  attempts leave no `exam_attempts` row), grade **distribution** + pass rate +
+  average time, **per-lecture difficulty** (weakest first, from
+  `exam_attempt_questions.max_lecture`), and **retake/improvement** (attempts per
+  student, first-vs-latest grade). Portable SQL, no schema change. Linked from the
+  admin hub and the stats/analytics/abuse nav.
 
 ---
 

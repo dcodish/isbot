@@ -60,6 +60,7 @@ if ($ccres) {
             <a href="home.php" class="btn btn-default btn-sm">🏠 ראשי</a>
             <a href="index.php" class="btn btn-primary btn-sm">ניהול שאלות</a>
             <a href="stats.php" class="btn btn-default btn-sm">לוח נתונים</a>
+            <a href="exam.php" class="btn btn-default btn-sm">📝 מצב מבחן</a>
             <a href="cohorts.php" class="btn btn-default btn-sm">ניהול סמסטרים</a>
         </nav>
 

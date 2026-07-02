@@ -129,6 +129,7 @@ function cell($val, $amber, $red, $invert=false) {
         <div>
             <a href="stats.php" class="btn btn-default btn-sm">📊 Usage Stats</a>
             <a href="analytics.php" class="btn btn-default btn-sm">📈 Analytics</a>
+            <a href="exam.php" class="btn btn-default btn-sm">📝 Exam Mode</a>
             <a href="home.php" class="btn btn-default btn-sm">🏠 ראשי</a>
             <a href="logout.php" class="btn btn-default btn-sm">התנתקות</a>
         </div>

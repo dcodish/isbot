@@ -218,6 +218,7 @@ $dead_badges = count(array_filter($badges, fn($b) => (int)$b['earns'] === 0));
         <h2 style="margin:0; color:#435d7d;">📈 Gamification Analytics</h2>
         <div>
             <a href="stats.php" class="btn btn-default btn-sm">📊 Usage Stats</a>
+            <a href="exam.php" class="btn btn-default btn-sm">📝 Exam Mode</a>
             <a href="abuse.php" class="btn btn-default btn-sm">🕵️ Abuse Detection</a>
             <a href="home.php" class="btn btn-default btn-sm">🏠 ראשי</a>
             <a href="index.php" class="btn btn-default btn-sm">ניהול שאלות</a>
